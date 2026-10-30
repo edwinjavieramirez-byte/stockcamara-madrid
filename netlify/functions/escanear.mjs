@@ -2,12 +2,12 @@
 // y usa Claude para leerla. La clave de la API vive solo aquí, nunca en el móvil.
 import Anthropic from "@anthropic-ai/sdk";
 
-// ANTHROPIC_API_KEY se configura en las variables de entorno de Netlify (ámbito: Functions).
-// baseURL fijo: Netlify puede inyectar ANTHROPIC_BASE_URL para usar su AI Gateway, que tiene
-// límites de tamaño por plan y no deja pasar cabeceras beta. Aquí se va siempre directo a Anthropic.
+// CLAUDE_API_KEY se configura en las variables de entorno de Netlify (ámbito: Functions).
+// No se usa ANTHROPIC_API_KEY porque Netlify puede inyectar ahí la credencial de su AI Gateway
+// (igual que ANTHROPIC_BASE_URL y ANTHROPIC_AUTH_TOKEN). Aquí se va siempre directo a Anthropic.
 // Se limpian los espacios o comillas que se cuelen al pegar la clave en Netlify.
-const CLAVE = (Netlify.env.get("ANTHROPIC_API_KEY") || "").trim().replace(/^["']|["']$/g, "");
-const client = new Anthropic({ apiKey: CLAVE || "sin-clave", baseURL: "https://api.anthropic.com" });
+const CLAVE = (Netlify.env.get("CLAUDE_API_KEY") || "").trim().replace(/^["']|["']$/g, "");
+const client = new Anthropic({ apiKey: CLAVE || "sin-clave", authToken: null, baseURL: "https://api.anthropic.com" });
 const MODEL = Netlify.env.get("CLAUDE_MODEL") || "claude-sonnet-5-5";
 
 const ESQUEMA_LECTURA = {
@@ -66,7 +66,7 @@ function mensajeError(e) {
     // Diagnóstico sin revelar la clave: solo si existe, cuánto mide y si tiene el formato esperado
     const diagnostico = CLAVE
       ? `Netlify tiene un valor de ${CLAVE.length} caracteres, que ${CLAVE.startsWith("sk-ant-") ? "sí" : "NO"} empieza por sk-ant-.`
-      : "Netlify no le da ningún valor a la función.";
+      : "Falta la variable CLAUDE_API_KEY en Netlify, o no está disponible para Functions.";
     return `La clave de Claude no es válida. ${diagnostico} Respuesta de Anthropic: ${e.error?.error?.message || e.message}`;
   }
   if (e instanceof Anthropic.PermissionDeniedError) return "La clave de Claude no tiene permiso para usar este modelo.";
