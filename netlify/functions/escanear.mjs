@@ -5,7 +5,9 @@ import Anthropic from "@anthropic-ai/sdk";
 // ANTHROPIC_API_KEY se configura en las variables de entorno de Netlify (ámbito: Functions).
 // baseURL fijo: Netlify puede inyectar ANTHROPIC_BASE_URL para usar su AI Gateway, que tiene
 // límites de tamaño por plan y no deja pasar cabeceras beta. Aquí se va siempre directo a Anthropic.
-const client = new Anthropic({ apiKey: Netlify.env.get("ANTHROPIC_API_KEY"), baseURL: "https://api.anthropic.com" });
+// Se limpian los espacios o comillas que se cuelen al pegar la clave en Netlify.
+const CLAVE = (Netlify.env.get("ANTHROPIC_API_KEY") || "").trim().replace(/^["']|["']$/g, "");
+const client = new Anthropic({ apiKey: CLAVE || "sin-clave", baseURL: "https://api.anthropic.com" });
 const MODEL = Netlify.env.get("CLAUDE_MODEL") || "claude-sonnet-5-5";
 
 const ESQUEMA_LECTURA = {
@@ -60,7 +62,13 @@ async function llamar(content, schema) {
 
 // Mensajes claros para la pantalla del móvil, en vez del error en bruto de la API
 function mensajeError(e) {
-  if (e instanceof Anthropic.AuthenticationError) return "La clave de Claude no es válida. Revisa ANTHROPIC_API_KEY en Netlify y vuelve a desplegar.";
+  if (e instanceof Anthropic.AuthenticationError) {
+    // Diagnóstico sin revelar la clave: solo si existe, cuánto mide y si tiene el formato esperado
+    const diagnostico = CLAVE
+      ? `Netlify tiene un valor de ${CLAVE.length} caracteres, que ${CLAVE.startsWith("sk-ant-") ? "sí" : "NO"} empieza por sk-ant-.`
+      : "Netlify no le da ningún valor a la función.";
+    return `La clave de Claude no es válida. ${diagnostico} Respuesta de Anthropic: ${e.error?.error?.message || e.message}`;
+  }
   if (e instanceof Anthropic.PermissionDeniedError) return "La clave de Claude no tiene permiso para usar este modelo.";
   if (e instanceof Anthropic.NotFoundError) return "Modelo de Claude no disponible. Revisa CLAUDE_MODEL en Netlify.";
   if (e instanceof Anthropic.RateLimitError) return "Demasiadas fotos seguidas o límite de gasto alcanzado. Espera un momento y repite.";
