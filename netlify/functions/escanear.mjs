@@ -2,8 +2,10 @@
 // y usa Claude para leerla. La clave de la API vive solo aquí, nunca en el móvil.
 import Anthropic from "@anthropic-ai/sdk";
 
-// ANTHROPIC_API_KEY se configura en las variables de entorno de Netlify (ámbito: Functions)
-const client = new Anthropic({ apiKey: Netlify.env.get("ANTHROPIC_API_KEY") });
+// ANTHROPIC_API_KEY se configura en las variables de entorno de Netlify (ámbito: Functions).
+// baseURL fijo: Netlify puede inyectar ANTHROPIC_BASE_URL para usar su AI Gateway, que tiene
+// límites de tamaño por plan y no deja pasar cabeceras beta. Aquí se va siempre directo a Anthropic.
+const client = new Anthropic({ apiKey: Netlify.env.get("ANTHROPIC_API_KEY"), baseURL: "https://api.anthropic.com" });
 const MODEL = Netlify.env.get("CLAUDE_MODEL") || "claude-sonnet-5-5";
 
 const ESQUEMA_LECTURA = {
@@ -54,6 +56,17 @@ async function llamar(content, schema) {
   if (response.stop_reason === "refusal") throw new Error("Claude no ha podido procesar esta petición");
   const texto = response.content.filter((b) => b.type === "text").map((b) => b.text).join("");
   return { datos: JSON.parse(texto), uso: response.usage };
+}
+
+// Mensajes claros para la pantalla del móvil, en vez del error en bruto de la API
+function mensajeError(e) {
+  if (e instanceof Anthropic.AuthenticationError) return "La clave de Claude no es válida. Revisa ANTHROPIC_API_KEY en Netlify y vuelve a desplegar.";
+  if (e instanceof Anthropic.PermissionDeniedError) return "La clave de Claude no tiene permiso para usar este modelo.";
+  if (e instanceof Anthropic.NotFoundError) return "Modelo de Claude no disponible. Revisa CLAUDE_MODEL en Netlify.";
+  if (e instanceof Anthropic.RateLimitError) return "Demasiadas fotos seguidas o límite de gasto alcanzado. Espera un momento y repite.";
+  if (e instanceof Anthropic.APIConnectionError) return "No se ha podido conectar con Claude. Repite la foto.";
+  if (e instanceof Anthropic.APIError) return `Claude ha devuelto un error (${e.status}): ${e.error?.error?.message || e.message}`;
+  return e.message || "Error al llamar a Claude";
 }
 
 function json(body, status = 200) {
@@ -118,7 +131,7 @@ Si el lote o la caducidad coinciden con un candidato, es una prueba fuerte. Si n
     return json({ error: "Acción desconocida" }, 400);
   } catch (e) {
     console.error(e);
-    return json({ error: e.message || "Error al llamar a Claude" }, 502);
+    return json({ error: mensajeError(e) }, 502);
   }
 };
 

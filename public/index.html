@@ -85,7 +85,7 @@ label.f { display: block; font-size: 14px; color: var(--muted); margin: 10px 0 4
 .tbl tr.here td { background: var(--ok-bg); }
 .scroll { overflow-x: auto; }
 .thumb { max-width: 100%; max-height: 220px; border-radius: 10px; display: block; margin: 10px auto 0; }
-.status { padding: 10px 12px; border-radius: 10px; background: var(--chip); margin-top: 10px; font-size: 15px; }
+.status { padding: 10px 12px; border-radius: 10px; background: var(--chip); margin-top: 10px; font-size: 15px; overflow-wrap: anywhere; }
 .cand { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
 .cand .s { color: var(--muted); font-size: 13px; white-space: nowrap; }
 details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
@@ -671,7 +671,8 @@ async function procesarFoto(file) {
     const k = el.articulo && IDX.articulos.has(normArt(el.articulo)) ? normArt(el.articulo) : null;
     mostrarResultado({ k, confianza: k ? el.confianza : "baja", fuente: "IA (comparación)", motivo: el.motivo, lectura, rk });
   } catch (e) {
-    estado(`⚠️ ${esc(e.message)}<br><span class="muted">Si estás abriendo la app sin Netlify, el escaneo con IA no funciona: usa la búsqueda manual.</span>`);
+    const sinRed = e instanceof TypeError; // fetch falla con TypeError cuando no hay conexión
+    estado(`⚠️ ${esc(sinRed ? "No hay conexión con el servidor. Comprueba la cobertura y repite la foto." : e.message)}<br><span class="muted">Mientras tanto puedes usar la búsqueda manual.</span>`);
   }
 }
 
