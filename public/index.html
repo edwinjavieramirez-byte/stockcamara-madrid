@@ -335,7 +335,6 @@ const TIPOS = {
     campos: [
       ["articulo", "Nº artículo", true], ["descripcion", "Descriptivo", true], ["lote", "Lote"], ["caducidad", "Fecha caducidad"],
       ["cajas", "Cajas / unidades"], ["ua", "Nº UA"], ["situacion", "Situación"], ["entrada", "Nº entrada"], ["ubicacion", "Ubicación", true],
-      ["tipo", "Tipo de ubicación (Picking / Reserva)"],
     ],
   },
   maestro: {
@@ -416,6 +415,13 @@ let IDX = null;
 async function cargarEstado() {
   for (const k of Object.keys(S)) { const v = await store.get(k); if (v !== undefined) S[k] = v; }
   S.ajustes = Object.assign({ digitos: 1, niveles: "1,2", codigo: "", tema: "", zona: "08", responsable: false }, S.ajustes);
+  // Una versión anterior podía recordar tipos sacados de una columna equivocada: se rehacen una vez desde las vacías
+  if (!S.ajustes.tiposRevisados) {
+    S.tiposUbi = {};
+    for (const f of S.vacias?.filas || []) { const t = tipoEsPicking(f.tipo); if (t !== null) S.tiposUbi[normUbi(f.ubicacion)] = t; }
+    S.ajustes.tiposRevisados = true;
+    await guardar("tiposUbi"); await guardar("ajustes");
+  }
 }
 const guardar = (k) => store.set(k, S[k]);
 
@@ -440,8 +446,9 @@ const nivelesPicking = () => new Set(String(S.ajustes.niveles).split(/[^\d]+/).f
 let TIPO_UBI = new Map(); // ubi normalizada -> true (picking) / false
 function tipoEsPicking(t) {
   const s = norm(t);
-  if (!s) return null;
-  return s.includes("picking") || s === "300";
+  if (s.includes("picking")) return true;
+  if (/reserva|muelle|dock|transit/.test(s)) return false;
+  return null; // un valor que no se reconoce no dice nada: se decide por el nivel
 }
 const esPicking = (u) => TIPO_UBI.get(normUbi(u)) ?? nivelesPicking().has(nivelDe(u));
 // Solo se trabaja con la zona elegida (08 = Madrid); el resto de almacenes de los Excel se ignora.
@@ -459,7 +466,7 @@ const disponible = (f) => { const s = String(f.situacion ?? "").trim(); return !
 
 function construirIndice() {
   TIPO_UBI = new Map(Object.entries(S.tiposUbi || {}).filter(([u]) => enZona(u))); // tipos recordados de cargas anteriores
-  for (const f of [...(S.vacias?.filas || []), ...(S.stock?.filas || [])]) {
+  for (const f of S.vacias?.filas || []) { // el Excel de stock no trae el tipo de ubicación
     if (!enZona(f.ubicacion)) continue;
     const t = tipoEsPicking(f.tipo);
     if (t !== null) TIPO_UBI.set(normUbi(f.ubicacion), t);
