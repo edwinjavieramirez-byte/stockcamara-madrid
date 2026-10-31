@@ -1,6 +1,6 @@
 {
-  "name": "Stock Cámara · Picking",
-  "short_name": "Picking",
+  "name": "Buscador de artículos",
+  "short_name": "Buscador",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0d1820",

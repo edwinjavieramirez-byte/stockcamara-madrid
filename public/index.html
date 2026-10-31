@@ -7,11 +7,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Picking">
+<meta name="apple-mobile-web-app-title" content="Buscador de artículos">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">
-<title>Stock Cámara</title>
+<title>Buscador de artículos</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
@@ -33,11 +33,16 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-header { position: sticky; top: 0; z-index: 5; background: #0f2a3d; color: #fff; padding: calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left)); }
-header h1 { margin: 0 0 10px; font-size: 18px; letter-spacing: .3px; }
-nav { display: flex; gap: 4px; overflow-x: auto; }
+header { position: sticky; top: 0; z-index: 5; background: #0f2a3d; color: #fff; padding-top: env(safe-area-inset-top); }
+/* el logo tiene fondo blanco: va en una franja blanca también en modo oscuro */
+.marca { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #fff; padding: 8px calc(16px + env(safe-area-inset-right)) 8px calc(16px + env(safe-area-inset-left)); }
+.marca img { display: block; height: 44px; width: auto; }
+.marca span { color: #2f7aa6; font-size: 14px; font-weight: 700; letter-spacing: .3px; text-align: right; }
+nav { display: flex; gap: 4px; overflow-x: auto; padding: 0 calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left)); }
 nav button { flex: 1; background: none; border: 0; color: #b9cbd8; padding: 10px 4px 12px; font: inherit; font-size: 15px; border-bottom: 3px solid transparent; white-space: nowrap; }
 nav button.on { color: #fff; border-bottom-color: #3aa3dc; font-weight: 600; }
+/* con la pestaña Movimientos, las cinco tienen que caber en el ancho de un móvil */
+@media (max-width: 480px) { nav { gap: 0; padding-left: 8px; padding-right: 8px; } nav button { font-size: 13px; padding-left: 3px; padding-right: 3px; } }
 main { padding: 16px; max-width: 760px; margin: 0 auto; padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
 /* anotar movimiento: botones grandes para usar con guantes */
 .anotar { border: 2px solid var(--accent); }
@@ -125,17 +130,17 @@ details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
 .ubi-nivel { display: inline-block; margin-top: 8px; padding: 3px 12px; border-radius: 99px; background: rgba(255,255,255,.22); font-size: 14px; font-weight: 700; }
 .destino-pie { margin-top: 12px; font-size: 15px; opacity: .95; }
 .destino-pie s { opacity: .8; }
-#resultado { scroll-margin-top: 110px; }
+#resultado { scroll-margin-top: 130px; }
 @keyframes pop { from { transform: scale(.94); } to { transform: none; } }
 .toast { position: fixed; left: 16px; right: 16px; bottom: 16px; background: #14212b; color: #fff; padding: 12px 14px; border-radius: 12px; z-index: 20; text-align: center; max-width: 520px; margin: 0 auto; }
 </style>
 </head>
 <body>
 <header>
-  <h1>❄️ Stock Cámara · Picking</h1>
+  <div class="marca"><img src="logo-garcimar.png" alt="Garcimar" width="104" height="44"><span>Buscador de artículos</span></div>
   <nav>
     <button data-tab="escanear" class="on">Escanear</button>
-    <button data-tab="movimientos" id="nav-mov" class="hidden">Mov.<span class="badge" id="nav-mov-n"></span></button>
+    <button data-tab="movimientos" id="nav-mov" class="hidden">Movimientos<span class="badge" id="nav-mov-n"></span></button>
     <button data-tab="informe">Informe</button>
     <button data-tab="datos">Datos</button>
     <button data-tab="ajustes">Ajustes</button>
@@ -179,6 +184,11 @@ details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
   <section class="tab" id="tab-movimientos">
     <div class="tiles" id="mov-tiles"></div>
     <p class="muted" id="mov-estado"></p>
+    <div class="card">
+      <label class="f" for="mov-buscar" style="margin-top:0">Buscar artículo: ¿adónde se ha llevado?</label>
+      <input type="search" id="mov-buscar" placeholder="Código o nombre del artículo" autocomplete="off">
+      <div id="mov-resumen"></div>
+    </div>
     <div class="card"><h2>Movimientos por hacer</h2><p class="muted">Toca un dato para copiarlo. Los más antiguos, primero.</p><div id="mov-porhacer"></div></div>
     <div class="card"><h2>Movimientos hechos</h2>
       <div class="row" style="margin-bottom:6px"><button class="btn small" id="btn-export-feed">⬇️ Exportar todos a Excel</button></div>
@@ -207,12 +217,13 @@ details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
   <!-- DATOS -->
   <section class="tab" id="tab-datos">
     <div class="card">
-      <h2>Cargar Excel</h2>
-      <p class="muted">Los datos se guardan solo en este móvil. Al cargar un archivo te pediré que confirmes qué columna es cada cosa (se recuerda para la próxima vez).</p>
+      <h2 id="datos-titulo">Cargar Excel</h2>
+      <p class="muted" id="datos-intro"></p>
+      <div id="base-estado"></div>
       <div id="cargas"></div>
     </div>
     <div class="card" id="mapeo" style="display:none"></div>
-    <div class="card">
+    <div class="card" id="card-ejemplo">
       <h2>Datos de ejemplo</h2>
       <p class="muted">Para probar la app sin tus Excel. Sustituye lo que haya cargado.</p>
       <button class="btn" id="btn-ejemplo">Cargar datos de ejemplo</button>
@@ -231,10 +242,11 @@ details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
   <section class="tab" id="tab-ajustes">
     <div class="card">
       <h2>Ubicaciones</h2>
-      <label class="f" for="aj-zona">Zona con la que trabajas (08 = Madrid; vacío = todas)</label>
+      <label class="f" for="aj-zona">Almacén con el que trabajas (08 = Madrid; vacío = todos)</label>
       <input type="text" id="aj-zona" inputmode="numeric" placeholder="08">
-      <p class="muted">Todo lo que esté fuera de esta zona se ignora en los Excel. Al escribir tu ubicación puedes omitir la zona: «01-004-01-1» se entiende como «08-01-004-01-1».</p>
-      <p class="muted">Formato reconocido: <b>ZZ-FF-HHH-NN-P</b> (zona-fila-hueco-nivel-posición), con o sin guiones. Si una ubicación tiene su tipo en los Excel (Picking / Reserva), se usa ese tipo; si no, se decide por el nivel.</p>
+      <p class="muted">Todo lo que sea de otro almacén se ignora en los Excel. Al escribir tu ubicación puedes omitir el almacén: «01-004-01-1» se entiende como «08-01-004-01-1».</p>
+      <p class="muted">Formato reconocido: <b>AA-FF-HHH-NN-1</b> (almacén-fila-hueco-nivel), con o sin guiones. El 1 final es fijo en todas las ubicaciones y no significa nada.</p>
+      <p class="muted">Los niveles 1 y 2 son picking y del 3 en adelante, reserva. Si el Excel de ubicaciones vacías indica otro tipo, manda ese (por ejemplo, algunos terceros de Barcelona son picking).</p>
       <label class="f" for="aj-digitos">Solo para otros formatos: cuántos dígitos finales indican el nivel</label>
       <input type="number" id="aj-digitos" min="1" max="3">
       <label class="f" for="aj-niveles">Niveles de picking (separados por coma)</label>
@@ -408,7 +420,7 @@ function filaCabecera(filas) {
 let S = {
   stock: null, maestro: null, vacias: null, maestroManual: [], alias: {}, mapeos: {}, tiposUbi: {}, hechos: [],
   ajustes: { digitos: 1, niveles: "1,2", codigo: "", tema: "", zona: "08", responsable: false }, uso: {},
-  colaEv: [], feed: { cursor: "", movs: {} },
+  colaEv: [], feed: { cursor: "", movs: {} }, baseVer: {}, basePend: [],
 };
 let IDX = null;
 
@@ -426,7 +438,7 @@ async function cargarEstado() {
 const guardar = (k) => store.set(k, S[k]);
 
 // ---------- índice ----------
-// Formato del almacén: ZZ-FF-HHH-NN-P (zona-fila-hueco-nivel-posición), p. ej. 01-01-002-03-1
+// Formato: AA-FF-HHH-NN-1 (almacén-fila-hueco-nivel; el 1 final es fijo en el programa), p. ej. 01-01-002-03-1
 // o el mismo código sin guiones (0101002031).
 function partesUbi(u) {
   let p = String(u ?? "").trim().toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
@@ -799,18 +811,23 @@ function mostrarResultado(r) {
     // si la etiqueta no trae la caducidad, se coge la de su lote en el stock
     const mov = { id: Date.now() + "-" + Math.random().toString(36).slice(2, 6), fecha: Date.now(), articulo: a.articulo, descripcion: a.descripcion,
       desde: uTxt, hacia, cajas, ua, lote: fila?.lote || lect.lote || "", caducidad: fila?.cad || normFecha(lect.caducidad) || delLote[0]?.cad || "" };
-    S.hechos.push({ ...mov, k: a.k, compartido: true });
+    S.hechos.push({ ...mov, k: a.k, compartido: true, cod: S.ajustes.codigo });
     await guardar("hechos");
     await encolar({ tipo: "alta", id: mov.id, mov });
     pintarInforme();
-    $("#an-cajas").value = "";
+    limpiarEscaneo();
     toast(`Anotado: ${cajas} cajas → ${hacia}`);
     await enviarCola();
     if (ERROR_ENVIO) toast(`Guardado en el móvil, se enviará solo. ${ERROR_ENVIO}`);
   });
   $("#btn-ok")?.addEventListener("click", () => { aprenderAlias(r.lectura, r.k); toast("Guardado: la próxima vez lo reconoce al momento"); });
   $("#btn-asignar")?.addEventListener("click", async () => {
-    S.maestroManual.push({ articulo: a.articulo, ubicacion: uTxt, descripcion: a.descripcion });
+    const asignacion = { articulo: a.articulo, ubicacion: uTxt, descripcion: a.descripcion };
+    if (S.ajustes.codigo) {
+      try { await apiMov({ accion: "asignar", ...asignacion }, "/api/base"); }
+      catch (e) { toast(`No se ha guardado. ${e instanceof TypeError ? "Sin conexión." : e.message}`); return; }
+    }
+    S.maestroManual.push(asignacion);
     await guardar("maestroManual");
     construirIndice(); pintarInforme(); mostrarResultado(r);
     toast(`${uTxt} asignado a ${a.articulo}`);
@@ -823,6 +840,17 @@ function mostrarResultado(r) {
   cont.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 const ALMACENES = { "08": "Garcimar Madrid", "01": "Garcimar Barcelona", "02": "Garcimar Málaga" };
+// Tras anotar se quita todo, para que la siguiente caja no se confunda con la foto anterior
+function limpiarEscaneo() {
+  ULTIMO = null;
+  $("#resultado").innerHTML = "";
+  $("#thumb").removeAttribute("src");
+  $("#thumb").classList.add("hidden");
+  $("#buscar").value = "";
+  $("#res-buscar").innerHTML = "";
+  estado("");
+  window.scrollTo(0, 0);
+}
 // Ubicación en grande: fila / hueco / nivel, con el almacén y el tipo de picking en pequeño
 function ubiGrande(u) {
   const pp = partesUbi(u);
@@ -944,21 +972,26 @@ function pintarHechos() {
     pintarInforme();
   }));
 }
-// Borrar un movimiento ya compartido también avisa al responsable
+// Borrar un movimiento ya compartido también avisa al responsable.
+// Lo anotado con otro código no se puede borrar desde aquí: se queda en la lista para que no parezca borrado.
 async function quitarHechos(lista) {
-  const ids = new Set(lista.map((h) => h.id));
+  const deOtro = (h) => h.compartido && h.cod && h.cod !== S.ajustes.codigo && !S.ajustes.responsable;
+  const bloqueados = lista.filter(deOtro);
+  const ids = new Set(lista.filter((h) => !deOtro(h)).map((h) => h.id));
   S.hechos = S.hechos.filter((h) => !ids.has(h.id));
   await guardar("hechos");
-  for (const h of lista) if (h.compartido) await encolar({ tipo: "borrar", id: h.id });
+  for (const h of lista) if (h.compartido && ids.has(h.id)) await encolar({ tipo: "borrar", id: h.id });
   enviarCola();
+  if (bloqueados.length) toast(`${bloqueados.length === 1 ? "1 movimiento se anotó" : `${bloqueados.length} movimientos se anotaron`} con otro código: se borran desde Movimientos.`);
+  return bloqueados.length;
 }
 
 // ---------- movimientos compartidos ----------
 // Todo lo que cambia (alta, hecho, deshacer, borrar) se guarda en una cola del móvil y se envía desde ahí,
 // así un movimiento anotado sin cobertura no se pierde y sale solo al volver la señal.
 let ERROR_ENVIO = "", enviando = false, timerEnvio = null;
-async function apiMov(body) {
-  const r = await fetch("/api/movimientos", {
+async function apiMov(body, ruta = "/api/movimientos") {
+  const r = await fetch(ruta, {
     method: "POST",
     headers: { "content-type": "application/json", "x-app-code": S.ajustes.codigo || "" },
     body: JSON.stringify(body),
@@ -1006,7 +1039,10 @@ function aplicarEvento(e) {
   const antes = JSON.stringify(m);
   if (e.tipo === "hecho") { m.estado = "hecho"; m.hechoEn = e.en; }
   else if (e.tipo === "deshacer") { m.estado = "porhacer"; delete m.hechoEn; }
-  else if (e.tipo === "borrar" && (e.responsable || e.movil === m.movil)) m.anulado = true;
+  else if (e.tipo === "borrar") {
+    if (e.responsable) m.eliminado = true; // lo borra el responsable: desaparece para todos
+    else if (e.movil === m.movil) m.anulado = true;
+  }
   return JSON.stringify(m) !== antes;
 }
 // El sistema del almacén solo reconoce la ubicación con 99 delante y sin guiones
@@ -1025,17 +1061,34 @@ function tarjetaMov(m) {
     <div class="copias">${chipCopia("Artículo", m.articulo)}${chipCopia("Cajas", m.cajas)}${chipCopia("Lote", m.lote)}${chipCopia("Caducidad", verFecha(m.caducidad))}${chipCopia("A su picking", codigoSistema(m.hacia), "destacada")}</div>
     <div class="mov-nom" style="margin:8px 0 0">${esc(m.descripcion)}</div>
     ${m.desde ? `<div class="muted">Desde ${esc(m.desde)}</div>` : ""}
-    <div class="mov-pie"><span class="muted">${esc(m.movil)} · ${hora}</span>${accion}</div>
+    <div class="mov-pie"><span class="muted">${esc(m.movil)} · ${hora}</span><div class="row" style="flex:0 0 auto;flex-wrap:nowrap">${accion}<button class="btn small" data-borrar="${esc(m.id)}" aria-label="Borrar">✕</button></div></div>
   </div>`;
 }
 function pintarMovimientos() {
-  const todos = Object.values(S.feed.movs);
-  const porHacer = todos.filter((m) => m.estado !== "hecho" && !m.anulado).sort((a, b) => a.llegada - b.llegada);
-  const hechos = todos.filter((m) => m.estado === "hecho").sort((a, b) => b.hechoEn - a.hechoEn);
-  $("#nav-mov-n").textContent = porHacer.length || "";
-  $("#mov-tiles").innerHTML = [[porHacer.length, "por hacer"], [hechos.length, "hechos"]].map(([n, t]) => `<div class="tile"><b>${n}</b><span>${t}</span></div>`).join("");
-  $("#mov-porhacer").innerHTML = porHacer.map(tarjetaMov).join("") || `<p class="muted">No hay movimientos por hacer 👍</p>`;
-  $("#mov-hechos").innerHTML = hechos.slice(0, LIM).map(tarjetaMov).join("") + (hechos.length > LIM ? `<p class="muted">Mostrando ${LIM} de ${hechos.length}. Exporta a Excel para verlos todos.</p>` : "") || `<p class="muted">Todavía no hay ninguno.</p>`;
+  const todos = Object.values(S.feed.movs).filter((m) => !m.eliminado);
+  const porHacerTodos = todos.filter((m) => m.estado !== "hecho" && !m.anulado).sort((a, b) => a.llegada - b.llegada);
+  const hechosTodos = todos.filter((m) => m.estado === "hecho").sort((a, b) => b.hechoEn - a.hechoEn);
+  const q = $("#mov-buscar").value.trim();
+  const qN = norm(q);
+  const pasa = (m) => !qN || normArt(m.articulo) === normArt(q) || norm(`${m.articulo} ${m.descripcion}`).includes(qN);
+  const porHacer = porHacerTodos.filter(pasa), hechos = hechosTodos.filter(pasa);
+  $("#nav-mov-n").textContent = porHacerTodos.length || "";
+  $("#mov-tiles").innerHTML = [[porHacerTodos.length, "por hacer"], [hechosTodos.length, "hechos"]].map(([n, t]) => `<div class="tile"><b>${n}</b><span>${t}</span></div>`).join("");
+  // resumen de la búsqueda: cuántas cajas han ido a cada picking
+  const destinos = new Map();
+  for (const m of [...porHacer, ...hechos]) {
+    if (m.anulado) continue;
+    const c = codigoSistema(m.hacia);
+    const d = destinos.get(c) || { cajas: 0, movs: 0 };
+    d.cajas += m.cajas; d.movs++;
+    destinos.set(c, d);
+  }
+  $("#mov-resumen").innerHTML = !qN ? "" : destinos.size
+    ? `<h3>Llevado a</h3><ul class="list">${[...destinos].map(([c, d]) => `<li class="cand"><button class="copia destacada" data-copiar="${esc(c)}"><span>Picking</span><b>${esc(c)}</b></button><span class="s">${d.cajas} cajas · ${d.movs} mov.</span></li>`).join("")}</ul>`
+    : `<p class="muted">Ningún movimiento de ese artículo.</p>`;
+  const vacio = (txt) => `<p class="muted">${qN ? "Ninguno con ese artículo." : txt}</p>`;
+  $("#mov-porhacer").innerHTML = porHacer.map(tarjetaMov).join("") || vacio("No hay movimientos por hacer 👍");
+  $("#mov-hechos").innerHTML = hechos.slice(0, LIM).map(tarjetaMov).join("") + (hechos.length > LIM ? `<p class="muted">Mostrando ${LIM} de ${hechos.length}. Exporta a Excel para verlos todos.</p>` : "") || vacio("Todavía no hay ninguno.");
 }
 function estadoMov(txt) { $("#mov-estado").textContent = txt; }
 let consultando = false, timerMov = null;
@@ -1069,7 +1122,7 @@ function programarMov() {
 function pintarRol() {
   $("#nav-mov").classList.toggle("hidden", !S.ajustes.responsable);
   if (!S.ajustes.responsable && $("#tab-movimientos").classList.contains("on")) document.querySelector('nav button[data-tab="escanear"]').click();
-  pintarMovimientos();
+  pintarMovimientos(); pintarCargas(); pintarBase(); pintarAjustes();
 }
 async function comprobarRol() {
   if (!S.ajustes.codigo) { if (S.ajustes.responsable) { S.ajustes.responsable = false; await guardar("ajustes"); pintarRol(); } return; }
@@ -1096,6 +1149,90 @@ async function cambiarEstadoMov(tipo, id) {
   await encolar({ tipo, id });
   pintarMovimientos();
   enviarCola();
+}
+
+// ---------- base compartida ----------
+// El responsable carga los Excel y los ajustes; los demás dispositivos descargan lo que cambia.
+// Cada uno guarda su copia, así que sin cobertura se sigue trabajando con la última.
+const TIPOS_BASE = ["stock", "maestro", "vacias", "tipos", "ajustes"];
+const soloLectura = () => !!S.ajustes.codigo && !S.ajustes.responsable;
+const BASE = { metas: null, comprobada: 0, error: "" };
+const datosBase = (t) => t === "tipos" ? { mapa: S.tiposUbi } : t === "ajustes" ? { zona: S.ajustes.zona, niveles: S.ajustes.niveles, digitos: S.ajustes.digitos } : S[t];
+async function aplicarBase(t, datos) {
+  if (t === "tipos") { S.tiposUbi = datos.mapa || {}; await guardar("tiposUbi"); }
+  else if (t === "ajustes") { Object.assign(S.ajustes, datos); await guardar("ajustes"); }
+  else { S[t] = datos; await guardar(t); }
+}
+async function pasoBase() {
+  if (!S.ajustes.codigo) return;
+  try {
+    if (S.ajustes.responsable) {
+      while (S.basePend.length) {
+        const t = S.basePend[0];
+        const datos = datosBase(t);
+        if (datos) {
+          if (JSON.stringify(datos).length > 5.5e6) throw new Error(`El archivo de ${t} es demasiado grande para compartirlo.`);
+          S.baseVer[t] = (await apiMov({ accion: "subir", tipo: t, datos }, "/api/base")).version;
+          await guardar("baseVer");
+        }
+        S.basePend.shift();
+        await guardar("basePend");
+      }
+    } else if (S.basePend.length) { S.basePend = []; await guardar("basePend"); }
+    // las asignaciones hechas antes de existir la base compartida se suben una vez
+    if (!S.ajustes.asigMigradas) {
+      for (const m of S.maestroManual) await apiMov({ accion: "asignar", ...m }, "/api/base");
+      S.ajustes.asigMigradas = true;
+      await guardar("ajustes");
+    }
+    const r = await apiMov({ accion: "estado" }, "/api/base");
+    BASE.metas = r.metas;
+    let cambios = false;
+    for (const t of TIPOS_BASE) {
+      const meta = r.metas[t];
+      if (!meta || meta.version === S.baseVer[t]) continue;
+      const d = await apiMov({ accion: "descargar", tipo: t }, "/api/base");
+      if (!d.datos) continue;
+      await aplicarBase(t, d.datos);
+      S.baseVer[t] = meta.version;
+      await guardar("baseVer");
+      cambios = true;
+    }
+    if (JSON.stringify(r.asignaciones) !== JSON.stringify(S.maestroManual)) {
+      S.maestroManual = r.asignaciones;
+      await guardar("maestroManual");
+      cambios = true;
+    }
+    BASE.error = "";
+    BASE.comprobada = Date.now();
+    if (cambios) { aplicarTema(); refrescar(); toast("Base de datos actualizada"); }
+  } catch (e) {
+    BASE.error = e instanceof TypeError ? "Sin conexión: se usa la última copia de este dispositivo." : e.message;
+  }
+  pintarBase();
+}
+// Las sincronizaciones van una detrás de otra, para que una subida y una descarga no se crucen
+let colaBase = Promise.resolve();
+const sincronizarBase = () => (colaBase = colaBase.then(pasoBase));
+async function subirBase(tipos) {
+  for (const t of tipos) if (!S.basePend.includes(t)) S.basePend.push(t);
+  await guardar("basePend");
+  await sincronizarBase();
+}
+function pintarBase() {
+  const box = $("#base-estado");
+  if (!S.ajustes.codigo) { box.innerHTML = ""; return; }
+  const faltan = BASE.metas ? TIPOS_BASE.filter((t) => !BASE.metas[t] && datosBase(t)) : [];
+  const ofrecer = S.ajustes.responsable && !S.basePend.length && faltan.length;
+  const hora = BASE.comprobada ? new Date(BASE.comprobada).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : "";
+  const linea = BASE.error ? `🔴 ${esc(BASE.error)}`
+    : S.basePend.length ? "⏳ Compartiendo con todos…"
+    : BASE.metas && !TIPOS_BASE.some((t) => BASE.metas[t]) ? "⚠️ Todavía no hay base compartida."
+    : hora ? `🟢 Base compartida al día · comprobada a las ${hora}` : "Comprobando la base compartida…";
+  box.innerHTML = `<div class="status" style="margin-bottom:8px">${linea}</div>
+    <div class="row">${ofrecer ? `<button class="btn small primary" id="btn-compartir">Compartir con todos lo de este dispositivo</button>` : ""}<button class="btn small" id="btn-comprobar">Comprobar ahora</button></div>`;
+  $("#btn-comprobar").addEventListener("click", sincronizarBase);
+  $("#btn-compartir")?.addEventListener("click", async () => { await subirBase(faltan); if (!BASE.error) toast("Compartido con todos los dispositivos"); });
 }
 function pintarInforme() {
   const { mov, mezcla, vacios } = calcularInforme();
@@ -1144,12 +1281,18 @@ function descargarExcel(filas, hoja, nombre) {
 
 // ---------- carga de Excel ----------
 function pintarCargas() {
+  const lectura = soloLectura();
+  $("#datos-titulo").textContent = lectura ? "Base de datos" : "Cargar Excel";
+  $("#datos-intro").textContent = lectura ? "La carga el responsable y se actualiza sola en este dispositivo."
+    : S.ajustes.codigo ? "Lo que cargues aquí se comparte con todos los dispositivos. Al cargar un archivo te pediré que confirmes qué columna es cada cosa (se recuerda para la próxima vez)."
+    : "Los datos se guardan solo en este dispositivo. Al cargar un archivo te pediré que confirmes qué columna es cada cosa (se recuerda para la próxima vez).";
+  $("#card-ejemplo").classList.toggle("hidden", !!S.ajustes.codigo);
   $("#cargas").innerHTML = Object.entries(TIPOS).map(([t, def]) => {
     const d = S[t];
     return `<div style="border-top:1px solid var(--line);padding:12px 0">
       <div class="row" style="justify-content:space-between"><div><b>${def.titulo}</b>${t === "stock" ? "" : ' <span class="muted">(opcional)</span>'}<div class="muted">${def.desc}</div>
-      <div class="muted">${d ? `✅ ${S.ajustes.zona ? `${d.filas.filter((f) => enZona(f.ubicacion)).length} filas de la zona ${esc(S.ajustes.zona)} (de ${d.filas.length})` : `${d.filas.length} filas`} · ${esc(d.archivo)} · ${new Date(d.fecha).toLocaleString("es-ES")}` : "Sin cargar"}</div></div>
-      <label class="btn small" style="flex:0 0 auto">📂 Cargar<input type="file" class="hidden" data-tipo="${t}" accept=".xlsx,.xls,.xlsm,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"></label></div></div>`;
+      <div class="muted">${d ? `✅ ${S.ajustes.zona ? `${d.filas.filter((f) => enZona(f.ubicacion)).length} filas del almacén ${esc(S.ajustes.zona)} (de ${d.filas.length})` : `${d.filas.length} filas`} · ${esc(d.archivo)} · ${new Date(d.fecha).toLocaleString("es-ES")}` : "Sin cargar"}</div></div>
+      ${lectura ? "" : `<label class="btn small" style="flex:0 0 auto">📂 Cargar<input type="file" class="hidden" data-tipo="${t}" accept=".xlsx,.xls,.xlsm,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"></label>`}</div></div>`;
   }).join("");
   $("#cargas").querySelectorAll("input[type=file]").forEach((i) => i.addEventListener("change", (e) => leerExcel(e.target.dataset.tipo, e.target.files[0])));
 }
@@ -1215,6 +1358,10 @@ function mostrarMapeo(tipo, archivo, hojas, hoja, cab, datos, abrir) {
     box.style.display = "none";
     refrescar();
     toast(`${def.titulo}: ${filas.length} filas cargadas`);
+    if (S.ajustes.responsable) {
+      await subirBase(tipo === "vacias" ? ["vacias", "tipos"] : [tipo]);
+      toast(BASE.error ? `Guardado aquí, pero sin compartir: ${BASE.error}` : `${def.titulo}: compartido con todos`);
+    }
   });
   box.scrollIntoView({ behavior: "smooth" });
 }
@@ -1293,6 +1440,7 @@ function pintarCodigo(paso = "") {
     pintarCodigo();
     pintarRol();
     enviarCola();
+    sincronizarBase();
     toast(msg);
   });
 }
@@ -1300,12 +1448,14 @@ function pintarAjustes() {
   $("#aj-digitos").value = S.ajustes.digitos;
   $("#aj-niveles").value = S.ajustes.niveles;
   $("#aj-zona").value = S.ajustes.zona;
+  // la zona y los niveles son de la base compartida: solo los cambia el responsable
+  ["#aj-digitos", "#aj-niveles", "#aj-zona"].forEach((s) => { $(s).disabled = soloLectura(); });
   pintarCodigo();
   $("#aj-tema").value = S.ajustes.tema;
   const ej = [...IDX.ubiOriginal.values()][0] || "01-001-1";
   const pp = partesUbi(ej);
   const conTipo = [...TIPO_UBI.values()];
-  $("#aj-ejemplo").innerHTML = `Ejemplo: <b>${esc(ej)}</b> → ${pp?.zona ? `zona ${esc(pp.zona)}, ` : ""}${pp ? `fila ${esc(pp.fila)}, hueco ${esc(pp.hueco)}, ` : ""}nivel ${esc(nivelDe(ej))} (${esPicking(ej) ? "picking" : "reserva"})` +
+  $("#aj-ejemplo").innerHTML = `Ejemplo: <b>${esc(ej)}</b> → ${pp?.zona ? `${esc(ALMACENES[pp.zona] || `almacén ${pp.zona}`)}, ` : ""}${pp ? `fila ${esc(pp.fila)}, hueco ${esc(pp.hueco)}, ` : ""}nivel ${esc(nivelDe(ej))} (${esPicking(ej) ? "picking" : "reserva"})` +
     (conTipo.length ? `<br>Tipo conocido de ${conTipo.length} ubicaciones: ${conTipo.filter(Boolean).length} picking, ${conTipo.filter((x) => !x).length} otras.` : "");
   pintarUso();
 }
@@ -1322,9 +1472,12 @@ document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click
   if (movVisible()) consultarMov();
   programarMov();
 }));
+// La base cambia poco: se comprueba al volver a la app (como mucho una vez por minuto) y cada 5 minutos con ella abierta
+setInterval(() => { if (document.visibilityState === "visible") sincronizarBase(); }, 5 * 60000);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "visible") return;
   enviarCola();
+  if (Date.now() - BASE.comprobada > 60000) sincronizarBase();
   if (movVisible()) consultarMov();
   programarMov();
 });
@@ -1335,9 +1488,11 @@ $("#tab-movimientos").addEventListener("click", (e) => {
   if (b.dataset.copiar) copiar(b.dataset.copiar);
   else if (b.dataset.hecho) cambiarEstadoMov("hecho", b.dataset.hecho);
   else if (b.dataset.deshacer) cambiarEstadoMov("deshacer", b.dataset.deshacer);
+  else if (b.dataset.borrar && confirm("¿Borrar este movimiento para todos? Si ya lo registraste en el sistema, corrígelo también allí.")) cambiarEstadoMov("borrar", b.dataset.borrar);
 });
+$("#mov-buscar").addEventListener("input", pintarMovimientos);
 $("#btn-export-feed").addEventListener("click", () => {
-  const todos = Object.values(S.feed.movs).sort((a, b) => a.llegada - b.llegada);
+  const todos = Object.values(S.feed.movs).filter((m) => !m.eliminado).sort((a, b) => a.llegada - b.llegada);
   if (!todos.length) return toast("No hay movimientos");
   const filas = todos.map((m) => ({ "Fecha": new Date(m.fecha).toLocaleString("es-ES"), "Móvil": m.movil, "Artículo": m.articulo, "Descriptivo": m.descripcion, "Cajas": m.cajas, "Lote": m.lote, "Caducidad": verFecha(m.caducidad), "A su picking": codigoSistema(m.hacia), "Desde": m.desde, "UA": m.ua, "Estado": m.anulado ? "Borrado por el operario" : m.estado === "hecho" ? "Hecho" : "Por hacer" }));
   descargarExcel(filas, "Movimientos", `movimientos_compartidos_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -1358,7 +1513,8 @@ $("#btn-export-hechos").addEventListener("click", () => {
 });
 $("#btn-borrar-hechos").addEventListener("click", async () => {
   if (!S.hechos.length || !confirm("¿Borrar todos los movimientos anotados? Exporta antes si los necesitas.")) return;
-  await quitarHechos(S.hechos); pintarInforme(); toast("Movimientos anotados borrados");
+  const bloqueados = await quitarHechos(S.hechos); pintarInforme();
+  if (!bloqueados) toast("Movimientos anotados borrados");
 });
 $("#btn-export-maestro").addEventListener("click", () => {
   const filas = [...IDX.asignadoPorUbi].map(([u, k]) => ({ "Artículo": IDX.articulos.get(k)?.articulo || k, "Descriptivo": IDX.articulos.get(k)?.descripcion || "", "Ubicación picking": verUbi(u) }));
@@ -1383,20 +1539,24 @@ $("#btn-ejemplo").addEventListener("click", async () => {
   toast("Datos de ejemplo cargados");
 });
 const guardarAjustes = () => {
+  const antes = JSON.stringify(datosBase("ajustes"));
   S.ajustes.digitos = Math.max(1, Math.min(3, +$("#aj-digitos").value || 1));
   S.ajustes.niveles = $("#aj-niveles").value;
   S.ajustes.zona = $("#aj-zona").value.trim();
   S.ajustes.tema = $("#aj-tema").value;
   guardar("ajustes"); aplicarTema(); construirIndice(); pintarCargas(); pintarInforme(); pintarAjustes();
+  if (S.ajustes.responsable && JSON.stringify(datosBase("ajustes")) !== antes) subirBase(["ajustes"]);
 };
 ["#aj-digitos", "#aj-niveles", "#aj-zona", "#aj-tema"].forEach((s) => $(s).addEventListener("change", guardarAjustes));
 $("#btn-borrar-alias").addEventListener("click", async () => { if (!confirm("¿Borrar los alias aprendidos?")) return; S.alias = {}; await guardar("alias"); toast("Alias borrados"); });
 $("#btn-borrar-todo").addEventListener("click", async () => {
   if (!confirm("¿Borrar todos los Excel, alias y asignaciones de este móvil?")) return;
   // la cola no se borra: lo anotado sin cobertura se sigue enviando, y el historial compartido se vuelve a leer del servidor
-  for (const k of ["stock", "maestro", "vacias", "maestroManual", "alias", "mapeos", "tiposUbi", "hechos", "feed"]) await store.del(k);
-  S.stock = S.maestro = S.vacias = null; S.maestroManual = []; S.alias = {}; S.mapeos = {}; S.tiposUbi = {}; S.hechos = []; S.feed = { cursor: "", movs: {} };
+  // la base compartida no se toca: este dispositivo la vuelve a descargar
+  for (const k of ["stock", "maestro", "vacias", "maestroManual", "alias", "mapeos", "tiposUbi", "hechos", "feed", "baseVer", "basePend"]) await store.del(k);
+  S.stock = S.maestro = S.vacias = null; S.maestroManual = []; S.alias = {}; S.mapeos = {}; S.tiposUbi = {}; S.hechos = []; S.feed = { cursor: "", movs: {} }; S.baseVer = {}; S.basePend = [];
   refrescar(); pintarMovimientos(); toast("Datos borrados");
+  sincronizarBase();
 });
 
 (async () => {
@@ -1406,7 +1566,8 @@ $("#btn-borrar-todo").addEventListener("click", async () => {
   refrescar();
   pintarRol();
   enviarCola();
-  comprobarRol();
+  await comprobarRol();
+  sincronizarBase();
 })();
 </script>
 </body>
