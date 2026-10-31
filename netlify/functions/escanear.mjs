@@ -13,8 +13,9 @@ const MODEL = Netlify.env.get("CLAUDE_MODEL") || "claude-sonnet-5-5";
 const ESQUEMA_LECTURA = {
   type: "object",
   additionalProperties: false,
-  required: ["nombres", "nombre_es", "marca", "lote", "caducidad", "ean", "peso", "unidades", "otros_codigos", "legible"],
+  required: ["codigo_articulo", "nombres", "nombre_es", "marca", "lote", "caducidad", "ean", "peso", "unidades", "otros_codigos", "legible"],
   properties: {
+    codigo_articulo: { type: "string", description: "Código de artículo impreso en la etiqueta (Código Artículo, Cód. Art., Artículo), copiado exactamente, con sus ceros. Vacío si no aparece" },
     nombres: { type: "array", items: { type: "string" }, description: "Nombre del producto tal como aparece impreso, una entrada por idioma" },
     nombre_es: { type: "string", description: "Nombre del producto en español (traducido si no viene en español)" },
     marca: { type: "string" },
@@ -42,6 +43,7 @@ const ESQUEMA_ELECCION = {
 const PROMPT_LECTURA = `Eres un lector de etiquetas de cajas de producto congelado en un almacén.
 Lee la etiqueta de la foto y extrae los datos. Las etiquetas pueden venir en varios idiomas.
 - Copia el nombre del producto exactamente como está impreso en cada idioma que aparezca.
+- El código de artículo suele aparecer como «Código Artículo» o «Cód. Art.». No lo confundas con el lote, el EAN ni el peso.
 - El lote puede aparecer como LOT, L., Lote, Batch, Charge, Lotto o tras el identificador GS1 (10).
 - La caducidad puede aparecer como Cad., Best before, BBD, Consumir preferentemente antes de, MHD, DLUO, EXP o tras (15)/(17). Conviértela a AAAA-MM-DD.
 - Si un dato no aparece, déjalo vacío. No inventes nada.`;
@@ -86,8 +88,11 @@ export default async (req) => {
 
   // Código de acceso para que nadie más gaste tu API. Admite varios separados por comas
   // (uno por móvil), así puedes anular uno sin cambiar los demás.
-  const codigos = (Netlify.env.get("APP_CODE") || "").split(",").map((c) => c.trim()).filter(Boolean);
-  if (codigos.length && !codigos.includes(req.headers.get("x-app-code") || "")) return json({ error: "Código de acceso incorrecto" }, 401);
+  const lista = (nombre) => (Netlify.env.get(nombre) || "").split(",").map((c) => c.trim()).filter(Boolean);
+  const responsables = lista("APP_CODE_RESPONSABLE");
+  const codigos = [...lista("APP_CODE"), ...responsables];
+  const codigo = req.headers.get("x-app-code") || "";
+  if (codigos.length && !codigos.includes(codigo)) return json({ error: "Código de acceso incorrecto" }, 401);
 
   let body;
   try {
@@ -96,8 +101,8 @@ export default async (req) => {
     return json({ error: "Petición no válida" }, 400);
   }
 
-  // Solo comprueba el código, sin llamar a Claude (no gasta nada)
-  if (body.accion === "comprobar") return json({ ok: true });
+  // Solo comprueba el código, sin llamar a Claude (no gasta nada), y dice si es de responsable
+  if (body.accion === "comprobar") return json({ ok: true, responsable: responsables.includes(codigo) });
 
   try {
     if (body.accion === "leer") {
@@ -128,7 +133,7 @@ Artículos candidatos del almacén (código | descriptivo | lotes en stock | cad
 ${lista}
 
 ¿Qué artículo de la lista es la caja? Los descriptivos del almacén suelen estar abreviados, en mayúsculas o en otro idioma que la etiqueta.
-Si el lote o la caducidad coinciden con un candidato, es una prueba fuerte. Si ninguno encaja con seguridad, deja "articulo" vacío.`,
+Si codigo_articulo coincide con el código de un candidato, es una prueba muy fuerte, salvo que el producto sea claramente otro (el código pudo leerse mal). Si el lote o la caducidad coinciden con un candidato, también es una prueba fuerte. Si ninguno encaja con seguridad, deja "articulo" vacío.`,
           },
         ],
         ESQUEMA_ELECCION

@@ -36,7 +36,7 @@ html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.
 header { position: sticky; top: 0; z-index: 5; background: #0f2a3d; color: #fff; padding: calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left)); }
 header h1 { margin: 0 0 10px; font-size: 18px; letter-spacing: .3px; }
 nav { display: flex; gap: 4px; overflow-x: auto; }
-nav button { flex: 1; background: none; border: 0; color: #b9cbd8; padding: 10px 6px 12px; font: inherit; font-size: 15px; border-bottom: 3px solid transparent; white-space: nowrap; }
+nav button { flex: 1; background: none; border: 0; color: #b9cbd8; padding: 10px 4px 12px; font: inherit; font-size: 15px; border-bottom: 3px solid transparent; white-space: nowrap; }
 nav button.on { color: #fff; border-bottom-color: #3aa3dc; font-weight: 600; }
 main { padding: 16px; max-width: 760px; margin: 0 auto; padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
 /* anotar movimiento: botones grandes para usar con guantes */
@@ -45,6 +45,19 @@ main { padding: 16px; max-width: 760px; margin: 0 auto; padding-bottom: calc(80p
 .stepper .btn { font-size: 28px; font-weight: 700; padding: 6px 0; }
 .stepper input { text-align: center; font-size: 30px; font-weight: 800; padding: 8px; }
 li.hecho { opacity: .55; }
+/* movimientos en directo: cada dato se copia con un toque */
+.mov { border-top: 1px solid var(--line); padding: 12px 0; }
+.mov:first-child { border-top: 0; }
+.mov-nom { font-size: 14px; color: var(--muted); margin: 6px 0 8px; }
+.copias { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; }
+.copia { display: block; text-align: left; min-width: 0; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; background: var(--bg); color: var(--text); font: inherit; cursor: pointer; }
+button.copia:active { border-color: var(--accent); }
+.copia span { display: block; font-size: 12px; color: var(--muted); }
+.copia b { display: block; font-size: 16px; overflow-wrap: anywhere; }
+.copia.destacada { background: var(--chip); border-color: var(--accent); }
+.mov-pie { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; }
+#nav-mov-n:empty { display: none; }
+#nav-mov-n { margin-left: 4px; color: var(--text); }
 section.tab { display: none; }
 section.tab.on { display: block; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
@@ -122,6 +135,7 @@ details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
   <h1>❄️ Stock Cámara · Picking</h1>
   <nav>
     <button data-tab="escanear" class="on">Escanear</button>
+    <button data-tab="movimientos" id="nav-mov" class="hidden">Mov.<span class="badge" id="nav-mov-n"></span></button>
     <button data-tab="informe">Informe</button>
     <button data-tab="datos">Datos</button>
     <button data-tab="ajustes">Ajustes</button>
@@ -159,6 +173,16 @@ details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
       <input type="search" id="buscar" placeholder="Ej. gamba, 1001, L24187, 00385…" autocomplete="off">
       <ul class="list" id="res-buscar"></ul>
     </div>
+  </section>
+
+  <!-- MOVIMIENTOS (solo responsable) -->
+  <section class="tab" id="tab-movimientos">
+    <div class="tiles" id="mov-tiles"></div>
+    <p class="muted" id="mov-estado"></p>
+    <div class="card"><h2>Movimientos por hacer</h2><p class="muted">Toca un dato para copiarlo. Los más antiguos, primero.</p><div id="mov-porhacer"></div></div>
+    <div class="card"><h2>Movimientos hechos</h2>
+      <div class="row" style="margin-bottom:6px"><button class="btn small" id="btn-export-feed">⬇️ Exportar todos a Excel</button></div>
+      <div id="mov-hechos"></div></div>
   </section>
 
   <!-- INFORME -->
@@ -384,13 +408,14 @@ function filaCabecera(filas) {
 // ---------- estado ----------
 let S = {
   stock: null, maestro: null, vacias: null, maestroManual: [], alias: {}, mapeos: {}, tiposUbi: {}, hechos: [],
-  ajustes: { digitos: 1, niveles: "1,2", codigo: "", tema: "", zona: "08" }, uso: {},
+  ajustes: { digitos: 1, niveles: "1,2", codigo: "", tema: "", zona: "08", responsable: false }, uso: {},
+  colaEv: [], feed: { cursor: "", movs: {} },
 };
 let IDX = null;
 
 async function cargarEstado() {
   for (const k of Object.keys(S)) { const v = await store.get(k); if (v !== undefined) S[k] = v; }
-  S.ajustes = Object.assign({ digitos: 1, niveles: "1,2", codigo: "", tema: "", zona: "08" }, S.ajustes);
+  S.ajustes = Object.assign({ digitos: 1, niveles: "1,2", codigo: "", tema: "", zona: "08", responsable: false }, S.ajustes);
 }
 const guardar = (k) => store.set(k, S[k]);
 
@@ -642,6 +667,15 @@ async function procesarFoto(file) {
     const rk = rankear(lectura);
     const top = rk[0], seg = rk[1];
 
+    // 0) código de artículo impreso: si además el nombre o el lote lo respaldan, no hay duda.
+    // Sin ese respaldo no se da por bueno, porque una cifra pudo leerse mal.
+    const kCodigo = lectura.codigo_articulo ? normArt(lectura.codigo_articulo) : "";
+    const porCodigo = kCodigo ? rk.find((x) => x.a.k === kCodigo) : null;
+    if (porCodigo && (porCodigo.nom >= 0.15 || porCodigo.porLote.length)) {
+      estado("");
+      mostrarResultado({ k: porCodigo.a.k, confianza: "alta", fuente: "Código de artículo", motivo: `La etiqueta indica el código de artículo ${lectura.codigo_articulo}.`, lectura, rk });
+      return;
+    }
     // 1) alias aprendido
     for (const n of [lectura.nombre_es, ...(lectura.nombres || [])]) {
       const ak = S.alias[norm(n)];
@@ -665,7 +699,7 @@ async function procesarFoto(file) {
     }
     // 3) dudoso: que Claude elija entre los candidatos
     estado("Comparando con los artículos del almacén…");
-    const candidatos = rk.slice(0, 15).map((x) => ({ articulo: x.a.k, descripcion: x.a.descripcion, lotes: x.a.lotes.slice(0, 6), caducidades: x.a.cads.slice(0, 6) }));
+    const candidatos = (porCodigo ? [porCodigo, ...rk.filter((x) => x !== porCodigo)] : rk).slice(0, 15).map((x) => ({ articulo: x.a.k, descripcion: x.a.descripcion, lotes: x.a.lotes.slice(0, 6), caducidades: x.a.cads.slice(0, 6) }));
     const el = await api({ accion: "elegir", lectura, candidatos });
     estado("");
     const k = el.articulo && IDX.articulos.has(normArt(el.articulo)) ? normArt(el.articulo) : null;
@@ -693,7 +727,7 @@ function mostrarResultado(r) {
   const leido = [
     lect.nombre_es && `<b>${esc(lect.nombre_es)}</b>`,
     lect.nombres?.length && lect.nombres.filter((n) => n !== lect.nombre_es).map(esc).join(" · "),
-    lect.lote && `Lote: ${esc(lect.lote)}`, lect.caducidad && `Cad.: ${esc(verFecha(normFecha(lect.caducidad)))}`, lect.ean && `EAN: ${esc(lect.ean)}`,
+    lect.codigo_articulo && `Código de artículo: ${esc(lect.codigo_articulo)}`, lect.lote && `Lote: ${esc(lect.lote)}`, lect.caducidad && `Cad.: ${esc(verFecha(normFecha(lect.caducidad)))}`, lect.ean && `EAN: ${esc(lect.ean)}`,
   ].filter(Boolean).join("<br>");
 
   const otros = (r.rk || []).filter((x) => x.a.k !== r.k).slice(0, 8);
@@ -755,12 +789,17 @@ function mostrarResultado(r) {
     const hacia = $("#an-destino")?.value || pk[0];
     const ua = $("#an-ua")?.value || "";
     const fila = ua ? a.filas.find((f) => f.ua === ua) : null;
-    S.hechos.push({ id: Date.now() + "-" + Math.random().toString(36).slice(2, 6), fecha: Date.now(), k: a.k, articulo: a.articulo, descripcion: a.descripcion,
-      desde: uTxt, hacia, cajas, ua, lote: fila?.lote || lect.lote || "" });
+    // si la etiqueta no trae la caducidad, se coge la de su lote en el stock
+    const mov = { id: Date.now() + "-" + Math.random().toString(36).slice(2, 6), fecha: Date.now(), articulo: a.articulo, descripcion: a.descripcion,
+      desde: uTxt, hacia, cajas, ua, lote: fila?.lote || lect.lote || "", caducidad: fila?.cad || normFecha(lect.caducidad) || delLote[0]?.cad || "" };
+    S.hechos.push({ ...mov, k: a.k, compartido: true });
     await guardar("hechos");
+    await encolar({ tipo: "alta", id: mov.id, mov });
     pintarInforme();
     $("#an-cajas").value = "";
     toast(`Anotado: ${cajas} cajas → ${hacia}`);
+    await enviarCola();
+    if (ERROR_ENVIO) toast(`Guardado en el móvil, se enviará solo. ${ERROR_ENVIO}`);
   });
   $("#btn-ok")?.addEventListener("click", () => { aprenderAlias(r.lectura, r.k); toast("Guardado: la próxima vez lo reconoce al momento"); });
   $("#btn-asignar")?.addEventListener("click", async () => {
@@ -776,16 +815,17 @@ function mostrarResultado(r) {
   }));
   cont.scrollIntoView({ behavior: "smooth", block: "start" });
 }
-// Ubicación en grande: fila / hueco / nivel, con la zona y la posición en pequeño
+const ALMACENES = { "08": "Garcimar Madrid", "01": "Garcimar Barcelona", "02": "Garcimar Málaga" };
+// Ubicación en grande: fila / hueco / nivel, con el almacén y el tipo de picking en pequeño
 function ubiGrande(u) {
   const pp = partesUbi(u);
   const nivel = nivelDe(u);
   const cuerpo = pp
     ? `<div class="ubi-codigo">${esc(u)}</div>
        <div class="ubi-partes"><div class="ubi-parte"><span>Fila</span><b>${esc(pp.fila)}</b></div><div class="ubi-parte"><span>Hueco</span><b>${esc(pp.hueco)}</b></div><div class="ubi-parte"><span>Nivel</span><b>${esc(pp.nivel)}</b></div></div>
-       ${pp.zona ? `<div class="ubi-extra">Zona <b>${esc(pp.zona)}</b> · Posición <b>${esc(pp.pos)}</b></div>` : ""}`
+       ${pp.zona ? `<div class="ubi-extra"><b>${esc(ALMACENES[pp.zona] || `Almacén ${pp.zona}`)}</b></div>` : ""}`
     : `<div class="ubi-entera">${esc(u)}</div>`;
-  return `<div class="destino-ubi">${cuerpo}<div class="ubi-nivel">${nivel === 1 ? "Picking de suelo" : nivel === 2 ? "Picking 2ª altura" : `Picking · nivel ${esc(nivel ?? "?")}`}</div></div>`;
+  return `<div class="destino-ubi">${cuerpo}<div class="ubi-nivel">${nivel === 1 ? "Picking suelo" : nivel ? "Picking altura" : "Picking"}</div></div>`;
 }
 function bloqueDestino(pk, uTxt, uActual) {
   const vibrar = (p) => { try { navigator.vibrate?.(p); } catch {} };
@@ -884,16 +924,171 @@ function hechoDe(m) {
 function pintarHechos() {
   const hechos = S.hechos || [];
   const hora = (t) => new Date(t).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const enCola = new Set(S.colaEv.filter((e) => e.tipo === "alta").map((e) => e.id));
+  const envio = (h) => !h.compartido ? "" : enCola.has(h.id) ? `<span class="badge warn">⏳ Pendiente de enviar</span>` : `<span class="badge ok">✔ Enviado</span>`;
   $("#inf-hechos").innerHTML = hechos.length ? `<p class="muted">${hechos.length} movimientos · ${hechos.reduce((n, h) => n + h.cajas, 0)} cajas</p><ul class="list">${[...hechos].reverse().slice(0, LIM).map((h) => `<li class="cand">
-      <div><div><b>${esc(h.desde || "¿?")}</b> → <b>${esc(h.hacia)}</b> · <b>${esc(h.cajas)} cajas</b></div>
+      <div><div>${h.desde ? `<b>${esc(h.desde)}</b> ` : ""}→ <b>${esc(h.hacia)}</b> · <b>${esc(h.cajas)} cajas</b> ${envio(h)}</div>
       <div>${esc(h.articulo)} · ${esc(h.descripcion)}</div>
       <div class="muted mono">${h.ua ? `UA ${esc(h.ua)} · ` : ""}${hora(h.fecha)}</div></div>
       <button class="btn small" data-borrar-hecho="${esc(h.id)}" aria-label="Borrar">✕</button></li>`).join("")}</ul>` : `<p class="muted">Todavía no hay movimientos anotados. Se anotan desde Escanear.</p>`;
   $("#inf-hechos").querySelectorAll("[data-borrar-hecho]").forEach((b) => b.addEventListener("click", async () => {
     if (!confirm("¿Borrar este movimiento anotado?")) return;
-    S.hechos = S.hechos.filter((h) => h.id !== b.dataset.borrarHecho);
-    await guardar("hechos"); pintarInforme();
+    await quitarHechos(S.hechos.filter((h) => h.id === b.dataset.borrarHecho));
+    pintarInforme();
   }));
+}
+// Borrar un movimiento ya compartido también avisa al responsable
+async function quitarHechos(lista) {
+  const ids = new Set(lista.map((h) => h.id));
+  S.hechos = S.hechos.filter((h) => !ids.has(h.id));
+  await guardar("hechos");
+  for (const h of lista) if (h.compartido) await encolar({ tipo: "borrar", id: h.id });
+  enviarCola();
+}
+
+// ---------- movimientos compartidos ----------
+// Todo lo que cambia (alta, hecho, deshacer, borrar) se guarda en una cola del móvil y se envía desde ahí,
+// así un movimiento anotado sin cobertura no se pierde y sale solo al volver la señal.
+let ERROR_ENVIO = "", enviando = false, timerEnvio = null;
+async function apiMov(body) {
+  const r = await fetch("/api/movimientos", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-app-code": S.ajustes.codigo || "" },
+    body: JSON.stringify(body),
+  });
+  let j = null;
+  try { j = await r.json(); } catch {}
+  if (!r.ok) throw Object.assign(new Error(j?.error || `Error ${r.status}`), { status: r.status });
+  return j;
+}
+async function encolar(ev) {
+  S.colaEv.push({ ...ev, ev: Date.now() + "-" + Math.random().toString(36).slice(2, 8) });
+  await guardar("colaEv");
+}
+async function enviarCola() {
+  if (enviando || !S.colaEv.length) return;
+  enviando = true;
+  clearTimeout(timerEnvio);
+  ERROR_ENVIO = "";
+  try {
+    while (S.colaEv.length) {
+      const lote = S.colaEv.slice(0, 50);
+      await apiMov({ accion: "eventos", eventos: lote });
+      const enviados = new Set(lote.map((e) => e.ev));
+      S.colaEv = S.colaEv.filter((e) => !enviados.has(e.ev));
+      await guardar("colaEv");
+    }
+  } catch (e) {
+    ERROR_ENVIO = e instanceof TypeError ? "Sin conexión." : e.message;
+    // con un código incorrecto no sirve reintentar: espera a que se corrija en Ajustes
+    if (e.status !== 401) timerEnvio = setTimeout(enviarCola, 30000);
+  } finally {
+    enviando = false;
+    pintarHechos();
+  }
+}
+function aplicarEvento(e) {
+  const movs = S.feed.movs;
+  if (e.tipo === "alta") {
+    if (movs[e.id]) return false; // repetido
+    movs[e.id] = { ...e.mov, id: e.id, movil: e.movil, llegada: e.en, estado: "porhacer" };
+    return true;
+  }
+  const m = movs[e.id];
+  if (!m) return false;
+  const antes = JSON.stringify(m);
+  if (e.tipo === "hecho") { m.estado = "hecho"; m.hechoEn = e.en; }
+  else if (e.tipo === "deshacer") { m.estado = "porhacer"; delete m.hechoEn; }
+  else if (e.tipo === "borrar" && (e.responsable || e.movil === m.movil)) m.anulado = true;
+  return JSON.stringify(m) !== antes;
+}
+// El sistema del almacén solo reconoce la ubicación con 99 delante y sin guiones
+const codigoSistema = (u) => { const n = normUbi(u); return !n || /^99\d{10}$/.test(n) ? n : "99" + n; };
+const chipCopia = (etq, valor, clase = "") => {
+  const v = String(valor ?? "").trim();
+  return v ? `<button class="copia ${clase}" data-copiar="${esc(v)}"><span>${etq}</span><b>${esc(v)}</b></button>` : `<div class="copia ${clase}"><span>${etq}</span><b>—</b></div>`;
+};
+function tarjetaMov(m) {
+  const hora = new Date(m.fecha).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const accion = m.anulado ? "" : m.estado === "hecho"
+    ? `<button class="btn small" data-deshacer="${esc(m.id)}">↩ Deshacer</button>`
+    : `<button class="btn small primary" data-hecho="${esc(m.id)}">✔ Hecho</button>`;
+  return `<div class="mov">
+    ${m.anulado ? `<div class="verdict bad" style="font-size:15px;margin-top:0">⚠️ El operario lo ha borrado. Revísalo en el sistema si ya lo registraste.</div>` : ""}
+    <div class="copias">${chipCopia("Artículo", m.articulo)}${chipCopia("Cajas", m.cajas)}${chipCopia("Lote", m.lote)}${chipCopia("Caducidad", verFecha(m.caducidad))}${chipCopia("A su picking", codigoSistema(m.hacia), "destacada")}</div>
+    <div class="mov-nom" style="margin:8px 0 0">${esc(m.descripcion)}</div>
+    ${m.desde ? `<div class="muted">Desde ${esc(m.desde)}</div>` : ""}
+    <div class="mov-pie"><span class="muted">${esc(m.movil)} · ${hora}</span>${accion}</div>
+  </div>`;
+}
+function pintarMovimientos() {
+  const todos = Object.values(S.feed.movs);
+  const porHacer = todos.filter((m) => m.estado !== "hecho" && !m.anulado).sort((a, b) => a.llegada - b.llegada);
+  const hechos = todos.filter((m) => m.estado === "hecho").sort((a, b) => b.hechoEn - a.hechoEn);
+  $("#nav-mov-n").textContent = porHacer.length || "";
+  $("#mov-tiles").innerHTML = [[porHacer.length, "por hacer"], [hechos.length, "hechos"]].map(([n, t]) => `<div class="tile"><b>${n}</b><span>${t}</span></div>`).join("");
+  $("#mov-porhacer").innerHTML = porHacer.map(tarjetaMov).join("") || `<p class="muted">No hay movimientos por hacer 👍</p>`;
+  $("#mov-hechos").innerHTML = hechos.slice(0, LIM).map(tarjetaMov).join("") + (hechos.length > LIM ? `<p class="muted">Mostrando ${LIM} de ${hechos.length}. Exporta a Excel para verlos todos.</p>` : "") || `<p class="muted">Todavía no hay ninguno.</p>`;
+}
+function estadoMov(txt) { $("#mov-estado").textContent = txt; }
+let consultando = false, timerMov = null;
+const movVisible = () => S.ajustes.responsable && $("#tab-movimientos").classList.contains("on") && document.visibilityState === "visible";
+async function consultarMov() {
+  if (consultando || !S.ajustes.responsable) return;
+  consultando = true;
+  try {
+    await enviarCola();
+    if (S.colaEv.length) { estadoMov(`🔴 ${ERROR_ENVIO || "Enviando cambios…"} Reintentando…`); return; }
+    let cambios = false, exacto = false, vueltas = 0, r;
+    do {
+      r = await apiMov({ accion: "novedades", desde: S.feed.cursor, exacto });
+      for (const e of r.eventos) if (aplicarEvento(e)) cambios = true;
+      S.feed.cursor = r.cursor;
+      exacto = true; // las páginas siguientes siguen justo donde acabó la anterior
+    } while (r.mas && ++vueltas < 50);
+    if (cambios) { await guardar("feed"); pintarMovimientos(); }
+    estadoMov(`🟢 En directo · actualizado a las ${new Date().toLocaleTimeString("es-ES")}`);
+  } catch (e) {
+    if (e.status === 403 || e.status === 401) { S.ajustes.responsable = false; await guardar("ajustes"); pintarRol(); return; }
+    estadoMov(`🔴 ${e instanceof TypeError ? "Sin conexión" : e.message}. Reintentando…`);
+  } finally { consultando = false; }
+}
+// Solo se consulta con la pestaña a la vista, para no gastar peticiones de Netlify
+function programarMov() {
+  clearTimeout(timerMov);
+  if (!movVisible()) return;
+  timerMov = setTimeout(async () => { await consultarMov(); programarMov(); }, 10000);
+}
+function pintarRol() {
+  $("#nav-mov").classList.toggle("hidden", !S.ajustes.responsable);
+  if (!S.ajustes.responsable && $("#tab-movimientos").classList.contains("on")) document.querySelector('nav button[data-tab="escanear"]').click();
+  pintarMovimientos();
+}
+async function comprobarRol() {
+  if (!S.ajustes.codigo) { if (S.ajustes.responsable) { S.ajustes.responsable = false; await guardar("ajustes"); pintarRol(); } return; }
+  try {
+    const r = await fetch("/api/escanear", { method: "POST", headers: { "content-type": "application/json", "x-app-code": S.ajustes.codigo }, body: JSON.stringify({ accion: "comprobar" }) });
+    if (r.status !== 401 && !r.ok) return;
+    const j = r.ok ? await r.json() : {};
+    if (!!j.responsable !== S.ajustes.responsable) { S.ajustes.responsable = !!j.responsable; await guardar("ajustes"); pintarRol(); }
+  } catch {} // sin conexión se mantiene lo último que se supo
+}
+async function copiar(t) {
+  try { await navigator.clipboard.writeText(t); }
+  catch {
+    const a = document.createElement("textarea");
+    a.value = t; document.body.appendChild(a); a.select();
+    try { document.execCommand("copy"); } finally { a.remove(); }
+  }
+  toast(`Copiado: ${t}`);
+}
+async function cambiarEstadoMov(tipo, id) {
+  const ev = { tipo, id, en: Date.now(), responsable: true };
+  aplicarEvento(ev);
+  await guardar("feed");
+  await encolar({ tipo, id });
+  pintarMovimientos();
+  enviarCola();
 }
 function pintarInforme() {
   const { mov, mezcla, vacios } = calcularInforme();
@@ -1073,21 +1268,24 @@ function pintarCodigo(paso = "") {
     <div class="row" style="margin-top:10px"><button class="btn small primary" id="cod-guardar">Guardar código</button>
     ${S.ajustes.codigo ? `<button class="btn small" id="cod-quitar">Quitar código</button><button class="btn small" id="cod-cancel">Cancelar</button>` : ""}</div>`;
   $("#cod-cancel")?.addEventListener("click", () => pintarCodigo());
-  $("#cod-quitar")?.addEventListener("click", async () => { S.ajustes.codigo = ""; await guardar("ajustes"); pintarCodigo(); toast("Código quitado"); });
+  $("#cod-quitar")?.addEventListener("click", async () => { S.ajustes.codigo = ""; S.ajustes.responsable = false; await guardar("ajustes"); pintarCodigo(); pintarRol(); toast("Código quitado"); });
   $("#cod-guardar").addEventListener("click", async () => {
     const nuevo = $("#cod-nuevo").value.trim();
     if (!nuevo) { toast("Escribe el código"); return; }
     const b = $("#cod-guardar"); b.disabled = true; b.textContent = "Comprobando…";
-    let msg = "Código guardado";
+    let msg = "Código guardado", responsable = false;
     try {
       const r = await fetch("/api/escanear", { method: "POST", headers: { "content-type": "application/json", "x-app-code": nuevo }, body: JSON.stringify({ accion: "comprobar" }) });
       if (r.status === 401) { toast("Ese código no es válido en el servidor"); b.disabled = false; b.textContent = "Guardar código"; return; }
-      if (r.ok) msg = "Código correcto y guardado ✔";
+      if (r.ok) { msg = "Código correcto y guardado ✔"; responsable = !!(await r.json()).responsable; }
       else msg = "Guardado (no he podido comprobarlo con el servidor)";
     } catch { msg = "Guardado (no he podido comprobarlo con el servidor)"; }
     S.ajustes.codigo = nuevo;
+    S.ajustes.responsable = responsable;
     await guardar("ajustes");
     pintarCodigo();
+    pintarRol();
+    enviarCola();
     toast(msg);
   });
 }
@@ -1114,7 +1312,29 @@ document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click
   document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("on", x === b));
   document.querySelectorAll("section.tab").forEach((s) => s.classList.toggle("on", s.id === "tab-" + b.dataset.tab));
   window.scrollTo(0, 0);
+  if (movVisible()) consultarMov();
+  programarMov();
 }));
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  enviarCola();
+  if (movVisible()) consultarMov();
+  programarMov();
+});
+window.addEventListener("online", enviarCola);
+$("#tab-movimientos").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.copiar) copiar(b.dataset.copiar);
+  else if (b.dataset.hecho) cambiarEstadoMov("hecho", b.dataset.hecho);
+  else if (b.dataset.deshacer) cambiarEstadoMov("deshacer", b.dataset.deshacer);
+});
+$("#btn-export-feed").addEventListener("click", () => {
+  const todos = Object.values(S.feed.movs).sort((a, b) => a.llegada - b.llegada);
+  if (!todos.length) return toast("No hay movimientos");
+  const filas = todos.map((m) => ({ "Fecha": new Date(m.fecha).toLocaleString("es-ES"), "Móvil": m.movil, "Artículo": m.articulo, "Descriptivo": m.descripcion, "Cajas": m.cajas, "Lote": m.lote, "Caducidad": verFecha(m.caducidad), "A su picking": codigoSistema(m.hacia), "Desde": m.desde, "UA": m.ua, "Estado": m.anulado ? "Borrado por el operario" : m.estado === "hecho" ? "Hecho" : "Por hacer" }));
+  descargarExcel(filas, "Movimientos", `movimientos_compartidos_${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
 $("#btn-ir-datos").addEventListener("click", () => document.querySelector('nav button[data-tab="datos"]').click());
 $("#btn-foto").addEventListener("click", () => $("#in-foto").click());
 $("#btn-galeria").addEventListener("click", () => $("#in-galeria").click());
@@ -1126,12 +1346,12 @@ $("#filtro-informe").addEventListener("input", pintarInforme);
 $("#btn-export-mov").addEventListener("click", exportarMovimientos);
 $("#btn-export-hechos").addEventListener("click", () => {
   if (!S.hechos.length) return toast("No hay movimientos anotados");
-  const filas = S.hechos.map((h) => ({ "Fecha": new Date(h.fecha).toLocaleString("es-ES"), "Desde": h.desde, "Hacia": h.hacia, "Artículo": h.articulo, "Descriptivo": h.descripcion, "UA": h.ua, "Lote": h.lote, "Cajas movidas": h.cajas }));
+  const filas = S.hechos.map((h) => ({ "Fecha": new Date(h.fecha).toLocaleString("es-ES"), "Desde": h.desde, "Hacia": h.hacia, "Artículo": h.articulo, "Descriptivo": h.descripcion, "UA": h.ua, "Lote": h.lote, "Caducidad": verFecha(h.caducidad || ""), "Cajas movidas": h.cajas }));
   descargarExcel(filas, "Anotados", `movimientos_anotados_${new Date().toISOString().slice(0, 10)}.xlsx`);
 });
 $("#btn-borrar-hechos").addEventListener("click", async () => {
   if (!S.hechos.length || !confirm("¿Borrar todos los movimientos anotados? Exporta antes si los necesitas.")) return;
-  S.hechos = []; await guardar("hechos"); pintarInforme(); toast("Movimientos anotados borrados");
+  await quitarHechos(S.hechos); pintarInforme(); toast("Movimientos anotados borrados");
 });
 $("#btn-export-maestro").addEventListener("click", () => {
   const filas = [...IDX.asignadoPorUbi].map(([u, k]) => ({ "Artículo": IDX.articulos.get(k)?.articulo || k, "Descriptivo": IDX.articulos.get(k)?.descripcion || "", "Ubicación picking": verUbi(u) }));
@@ -1166,9 +1386,10 @@ const guardarAjustes = () => {
 $("#btn-borrar-alias").addEventListener("click", async () => { if (!confirm("¿Borrar los alias aprendidos?")) return; S.alias = {}; await guardar("alias"); toast("Alias borrados"); });
 $("#btn-borrar-todo").addEventListener("click", async () => {
   if (!confirm("¿Borrar todos los Excel, alias y asignaciones de este móvil?")) return;
-  for (const k of ["stock", "maestro", "vacias", "maestroManual", "alias", "mapeos", "tiposUbi", "hechos"]) await store.del(k);
-  S.stock = S.maestro = S.vacias = null; S.maestroManual = []; S.alias = {}; S.mapeos = {}; S.tiposUbi = {}; S.hechos = [];
-  refrescar(); toast("Datos borrados");
+  // la cola no se borra: lo anotado sin cobertura se sigue enviando, y el historial compartido se vuelve a leer del servidor
+  for (const k of ["stock", "maestro", "vacias", "maestroManual", "alias", "mapeos", "tiposUbi", "hechos", "feed"]) await store.del(k);
+  S.stock = S.maestro = S.vacias = null; S.maestroManual = []; S.alias = {}; S.mapeos = {}; S.tiposUbi = {}; S.hechos = []; S.feed = { cursor: "", movs: {} };
+  refrescar(); pintarMovimientos(); toast("Datos borrados");
 });
 
 (async () => {
@@ -1176,6 +1397,9 @@ $("#btn-borrar-todo").addEventListener("click", async () => {
   aplicarTema();
   try { $("#ubi-actual").value = localStorage.getItem("ubiActual") || ""; } catch {}
   refrescar();
+  pintarRol();
+  enviarCola();
+  comprobarRol();
 })();
 </script>
 </body>
