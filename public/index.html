@@ -37,7 +37,18 @@ header { position: sticky; top: 0; z-index: 5; background: #0f2a3d; color: #fff;
 /* el logo tiene fondo blanco: va en una franja blanca también en modo oscuro */
 .marca { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #fff; padding: 8px calc(16px + env(safe-area-inset-right)) 8px calc(16px + env(safe-area-inset-left)); }
 .marca img { display: block; height: 44px; width: auto; }
+.marca-txt { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 0; }
 .marca span { color: #2f7aa6; font-size: 14px; font-weight: 700; letter-spacing: .3px; text-align: right; }
+#btn-almacen { border: 1px solid #2f7aa6; border-radius: 99px; background: #fff; color: #14212b; padding: 3px 10px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+/* pantalla de entrada: elegir almacén */
+.elegir { position: fixed; inset: 0; z-index: 30; overflow-y: auto; background: #fff; color: #14212b; padding: calc(32px + env(safe-area-inset-top)) 24px 32px; text-align: center; }
+.elegir img { display: block; width: 200px; max-width: 70%; height: auto; margin: 0 auto 20px; }
+.elegir h1 { margin: 0 0 4px; font-size: 21px; color: #2f7aa6; }
+.elegir p { margin: 0 0 24px; color: #4a5763; }
+.elegir-lista { display: grid; gap: 12px; max-width: 420px; margin: 0 auto; }
+.elegir-lista button { width: 100%; padding: 18px; border: 0; border-radius: 14px; background: #2f7aa6; color: #fff; font: inherit; font-size: 19px; font-weight: 700; cursor: pointer; }
+.elegir-lista button.ultimo { outline: 3px solid #14212b; outline-offset: 2px; }
+.elegir-lista button.cancelar { background: none; color: #4a5763; font-size: 16px; font-weight: 500; }
 nav { display: flex; gap: 4px; overflow-x: auto; padding: 0 calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left)); }
 nav button { flex: 1; background: none; border: 0; color: #b9cbd8; padding: 10px 4px 12px; font: inherit; font-size: 15px; border-bottom: 3px solid transparent; white-space: nowrap; }
 nav button.on { color: #fff; border-bottom-color: #3aa3dc; font-weight: 600; }
@@ -136,8 +147,14 @@ details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
 </style>
 </head>
 <body>
+<div class="elegir hidden" id="elegir-almacen" role="dialog" aria-label="Elegir almacén">
+  <img src="logo-garcimar.png" alt="Garcimar">
+  <h1>Buscador de artículos</h1>
+  <p>¿En qué almacén vas a trabajar?</p>
+  <div class="elegir-lista" id="elegir-lista"></div>
+</div>
 <header>
-  <div class="marca"><img src="logo-garcimar.png" alt="Garcimar" width="104" height="44"><span>Buscador de artículos</span></div>
+  <div class="marca"><img src="logo-garcimar.png" alt="Garcimar" width="104" height="44"><div class="marca-txt"><span>Buscador de artículos</span><button id="btn-almacen" aria-label="Cambiar de almacén"></button></div></div>
   <nav>
     <button data-tab="escanear" class="on">Escanear</button>
     <button data-tab="movimientos" id="nav-mov" class="hidden">Movimientos<span class="badge" id="nav-mov-n"></span></button>
@@ -184,6 +201,7 @@ details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
   <section class="tab" id="tab-movimientos">
     <div class="tiles" id="mov-tiles"></div>
     <p class="muted" id="mov-estado"></p>
+    <div id="mov-otros"></div>
     <div class="card">
       <label class="f" for="mov-buscar" style="margin-top:0">Buscar artículo: ¿adónde se ha llevado?</label>
       <input type="search" id="mov-buscar" placeholder="Código o nombre del artículo" autocomplete="off">
@@ -242,9 +260,9 @@ details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
   <section class="tab" id="tab-ajustes">
     <div class="card">
       <h2>Ubicaciones</h2>
-      <label class="f" for="aj-zona">Almacén con el que trabajas (08 = Madrid; vacío = todos)</label>
-      <input type="text" id="aj-zona" inputmode="numeric" placeholder="08">
-      <p class="muted">Todo lo que sea de otro almacén se ignora en los Excel. Al escribir tu ubicación puedes omitir el almacén: «01-004-01-1» se entiende como «08-01-004-01-1».</p>
+      <p style="margin:0 0 8px">Estás trabajando en <b id="aj-almacen"></b></p>
+      <button class="btn small" id="btn-cambiar-almacen">Cambiar de almacén</button>
+      <p class="muted">Todo lo que sea de otro almacén se ignora en los Excel. Al escribir tu ubicación puedes omitir el almacén: «01-004-01-1» se completa con el almacén en el que estás.</p>
       <p class="muted">Formato reconocido: <b>AA-FF-HHH-NN-1</b> (almacén-fila-hueco-nivel), con o sin guiones. El 1 final es fijo en todas las ubicaciones y no significa nada.</p>
       <p class="muted">Los niveles 1 y 2 son picking y del 3 en adelante, reserva. Si el Excel de ubicaciones vacías indica otro tipo, manda ese (por ejemplo, algunos terceros de Barcelona son picking).</p>
       <label class="f" for="aj-digitos">Solo para otros formatos: cuántos dígitos finales indican el nivel</label>
@@ -425,8 +443,19 @@ let S = {
 let IDX = null;
 
 async function cargarEstado() {
-  for (const k of Object.keys(S)) { const v = await store.get(k); if (v !== undefined) S[k] = v; }
+  for (const k of Object.keys(S)) { if (POR_ALMACEN.includes(k)) continue; const v = await store.get(k); if (v !== undefined) S[k] = v; }
   S.ajustes = Object.assign({ digitos: 1, niveles: "1,2", codigo: "", tema: "", zona: "08", responsable: false }, S.ajustes);
+  // Lo cargado antes de separar por almacén pasa al almacén que tenía elegido este dispositivo
+  if (!S.ajustes.porAlmacen) {
+    S.ajustes.zona = String(S.ajustes.zona || "").trim() || "08";
+    for (const k of POR_ALMACEN) {
+      const v = await store.get(k);
+      if (v !== undefined) { await store.set(claveDe(k), v); await store.del(k); }
+    }
+    S.ajustes.porAlmacen = true;
+    await guardar("ajustes");
+  }
+  await cargarAlmacen();
   // Una versión anterior podía recordar tipos sacados de una columna equivocada: se rehacen una vez desde las vacías
   if (!S.ajustes.tiposRevisados) {
     S.tiposUbi = {};
@@ -435,7 +464,14 @@ async function cargarEstado() {
     await guardar("tiposUbi"); await guardar("ajustes");
   }
 }
-const guardar = (k) => store.set(k, S[k]);
+// Lo de cada almacén se guarda aparte en el dispositivo (stock@08, stock@01…); S solo tiene el almacén elegido
+const POR_ALMACEN = ["stock", "maestro", "vacias", "tiposUbi", "baseVer", "basePend"];
+const claveDe = (k) => (POR_ALMACEN.includes(k) ? `${k}@${S.ajustes.zona}` : k);
+const guardar = (k) => store.set(claveDe(k), S[k]);
+async function cargarAlmacen() {
+  const vacio = { stock: null, maestro: null, vacias: null, tiposUbi: {}, baseVer: {}, basePend: [] };
+  for (const k of POR_ALMACEN) { const v = await store.get(claveDe(k)); S[k] = v !== undefined ? v : vacio[k]; }
+}
 
 // ---------- índice ----------
 // Formato: AA-FF-HHH-NN-1 (almacén-fila-hueco-nivel; el 1 final es fijo en el programa), p. ej. 01-01-002-03-1
@@ -463,7 +499,7 @@ function tipoEsPicking(t) {
   return null; // un valor que no se reconoce no dice nada: se decide por el nivel
 }
 const esPicking = (u) => TIPO_UBI.get(normUbi(u)) ?? nivelesPicking().has(nivelDe(u));
-// Solo se trabaja con la zona elegida (08 = Madrid); el resto de almacenes de los Excel se ignora.
+// Solo se trabaja con el almacén elegido (S.ajustes.zona); el resto de almacenes de los Excel se ignora.
 const enZona = (u) => { const z = normUbi(S.ajustes.zona); return !z || normUbi(u).startsWith(z); };
 // Si el operario escribe la ubicación sin la zona (01-004-01-1 o 01004011), se le añade
 function completarUbi(txt) {
@@ -506,11 +542,11 @@ function construirIndice() {
     stockPorUbi.get(fila.u).push(fila);
     ubiOriginal.set(fila.u, String(f.ubicacion).trim());
   }
-  const maestro = [...(S.maestro?.filas || []), ...S.maestroManual];
+  const maestro = [...(S.maestro?.filas || []), ...S.maestroManual].filter((m) => enZona(m.ubicacion));
   for (const m of maestro) {
     const a = art(m.articulo, m.descripcion);
     const u = normUbi(m.ubicacion);
-    if (!u || !enZona(m.ubicacion) || !esPicking(m.ubicacion)) continue; // solo se envía a picking, nunca a niveles de almacenaje
+    if (!u || !esPicking(m.ubicacion)) continue; // solo se envía a picking, nunca a niveles de almacenaje
     asignadoPorUbi.set(u, a.k);
     if (!pickingDeArt.has(a.k)) pickingDeArt.set(a.k, []);
     if (!pickingDeArt.get(a.k).some((x) => normUbi(x) === u)) pickingDeArt.get(a.k).push(String(m.ubicacion).trim());
@@ -956,8 +992,9 @@ const LIM = 300;
 function hechoDe(m) {
   return (S.hechos || []).find((h) => (h.ua && normDigitos(h.ua) === m.f.uaN) || (!h.ua && h.k === m.f.k && normUbi(h.desde) === normUbi(m.desde)));
 }
+const hechosAlmacen = () => (S.hechos || []).filter((h) => enZona(h.hacia));
 function pintarHechos() {
-  const hechos = S.hechos || [];
+  const hechos = hechosAlmacen();
   const hora = (t) => new Date(t).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   const enCola = new Set(S.colaEv.filter((e) => e.tipo === "alta").map((e) => e.id));
   const envio = (h) => !h.compartido ? "" : enCola.has(h.id) ? `<span class="badge warn">⏳ Pendiente de enviar</span>` : `<span class="badge ok">✔ Enviado</span>`;
@@ -1065,7 +1102,16 @@ function tarjetaMov(m) {
   </div>`;
 }
 function pintarMovimientos() {
-  const todos = Object.values(S.feed.movs).filter((m) => !m.eliminado);
+  const sinBorrar = Object.values(S.feed.movs).filter((m) => !m.eliminado);
+  const todos = sinBorrar.filter((m) => enZona(m.hacia));
+  // lo pendiente en otros almacenes se avisa, para que no se quede sin ver
+  const otros = new Map();
+  for (const m of sinBorrar) {
+    if (enZona(m.hacia) || m.estado === "hecho" || m.anulado) continue;
+    const z = normUbi(m.hacia).slice(0, 2);
+    otros.set(z, (otros.get(z) || 0) + 1);
+  }
+  $("#mov-otros").innerHTML = [...otros].map(([z, n]) => `<p class="muted">⚠️ ${n} por hacer en ${esc(nombreAlmacen(z))}</p>`).join("");
   const porHacerTodos = todos.filter((m) => m.estado !== "hecho" && !m.anulado).sort((a, b) => a.llegada - b.llegada);
   const hechosTodos = todos.filter((m) => m.estado === "hecho").sort((a, b) => b.hechoEn - a.hechoEn);
   const q = $("#mov-buscar").value.trim();
@@ -1157,10 +1203,11 @@ async function cambiarEstadoMov(tipo, id) {
 const TIPOS_BASE = ["stock", "maestro", "vacias", "tipos", "ajustes"];
 const soloLectura = () => !!S.ajustes.codigo && !S.ajustes.responsable;
 const BASE = { metas: null, comprobada: 0, error: "" };
-const datosBase = (t) => t === "tipos" ? { mapa: S.tiposUbi } : t === "ajustes" ? { zona: S.ajustes.zona, niveles: S.ajustes.niveles, digitos: S.ajustes.digitos } : S[t];
+const datosBase = (t) => t === "tipos" ? { mapa: S.tiposUbi } : t === "ajustes" ? { niveles: S.ajustes.niveles, digitos: S.ajustes.digitos } : S[t];
+const hayDatos = (t) => (t === "tipos" ? Object.keys(S.tiposUbi || {}).length > 0 : !!datosBase(t));
 async function aplicarBase(t, datos) {
   if (t === "tipos") { S.tiposUbi = datos.mapa || {}; await guardar("tiposUbi"); }
-  else if (t === "ajustes") { Object.assign(S.ajustes, datos); await guardar("ajustes"); }
+  else if (t === "ajustes") { S.ajustes.niveles = datos.niveles ?? S.ajustes.niveles; S.ajustes.digitos = datos.digitos ?? S.ajustes.digitos; await guardar("ajustes"); }
   else { S[t] = datos; await guardar(t); }
 }
 async function pasoBase() {
@@ -1172,7 +1219,7 @@ async function pasoBase() {
         const datos = datosBase(t);
         if (datos) {
           if (JSON.stringify(datos).length > 5.5e6) throw new Error(`El archivo de ${t} es demasiado grande para compartirlo.`);
-          S.baseVer[t] = (await apiMov({ accion: "subir", tipo: t, datos }, "/api/base")).version;
+          S.baseVer[t] = (await apiMov({ accion: "subir", almacen: S.ajustes.zona, tipo: t, datos }, "/api/base")).version;
           await guardar("baseVer");
         }
         S.basePend.shift();
@@ -1185,13 +1232,13 @@ async function pasoBase() {
       S.ajustes.asigMigradas = true;
       await guardar("ajustes");
     }
-    const r = await apiMov({ accion: "estado" }, "/api/base");
+    const r = await apiMov({ accion: "estado", almacen: S.ajustes.zona }, "/api/base");
     BASE.metas = r.metas;
     let cambios = false;
     for (const t of TIPOS_BASE) {
       const meta = r.metas[t];
       if (!meta || meta.version === S.baseVer[t]) continue;
-      const d = await apiMov({ accion: "descargar", tipo: t }, "/api/base");
+      const d = await apiMov({ accion: "descargar", almacen: S.ajustes.zona, tipo: t }, "/api/base");
       if (!d.datos) continue;
       await aplicarBase(t, d.datos);
       S.baseVer[t] = meta.version;
@@ -1219,15 +1266,44 @@ async function subirBase(tipos) {
   await guardar("basePend");
   await sincronizarBase();
 }
+// ---------- elegir almacén ----------
+const nombreAlmacen = (z) => ALMACENES[z] || `Almacén ${z}`;
+function pintarAlmacen() {
+  $("#btn-almacen").textContent = `📍 ${nombreAlmacen(S.ajustes.zona)} ▾`;
+  $("#aj-almacen").textContent = nombreAlmacen(S.ajustes.zona);
+  $("#ubi-actual").placeholder = `Ej. ${S.ajustes.zona}-01-004-01-1`;
+}
+function mostrarElegir(conCancelar) {
+  const box = $("#elegir-lista");
+  box.innerHTML = Object.entries(ALMACENES).map(([z, n]) => `<button data-almacen="${esc(z)}" class="${z === S.ajustes.zona ? "ultimo" : ""}">${esc(n)}</button>`).join("")
+    + (conCancelar ? `<button class="cancelar" data-cancelar="1">Cancelar</button>` : "");
+  $("#elegir-almacen").classList.remove("hidden");
+}
+// Va en la misma cola que la sincronización, para que una descarga en curso no acabe guardada en el otro almacén
+const cambiarAlmacen = (z) => (colaBase = colaBase.then(async () => {
+  if (z !== S.ajustes.zona) {
+    S.ajustes.zona = z;
+    await guardar("ajustes");
+    await cargarAlmacen();
+    BASE.metas = null; BASE.comprobada = 0; BASE.error = "";
+    limpiarEscaneo();
+    $("#ubi-actual").value = "";
+    try { localStorage.removeItem("ubiActual"); } catch {}
+    $("#mapeo").style.display = "none";
+    refrescar();
+    pintarMovimientos();
+  }
+  await pasoBase();
+}));
 function pintarBase() {
   const box = $("#base-estado");
   if (!S.ajustes.codigo) { box.innerHTML = ""; return; }
-  const faltan = BASE.metas ? TIPOS_BASE.filter((t) => !BASE.metas[t] && datosBase(t)) : [];
+  const faltan = BASE.metas ? TIPOS_BASE.filter((t) => !BASE.metas[t] && hayDatos(t)) : [];
   const ofrecer = S.ajustes.responsable && !S.basePend.length && faltan.length;
   const hora = BASE.comprobada ? new Date(BASE.comprobada).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : "";
   const linea = BASE.error ? `🔴 ${esc(BASE.error)}`
     : S.basePend.length ? "⏳ Compartiendo con todos…"
-    : BASE.metas && !TIPOS_BASE.some((t) => BASE.metas[t]) ? "⚠️ Todavía no hay base compartida."
+    : BASE.metas && !["stock", "maestro", "vacias"].some((t) => BASE.metas[t]) ? `⚠️ Todavía no hay base compartida de ${esc(nombreAlmacen(S.ajustes.zona))}.`
     : hora ? `🟢 Base compartida al día · comprobada a las ${hora}` : "Comprobando la base compartida…";
   box.innerHTML = `<div class="status" style="margin-bottom:8px">${linea}</div>
     <div class="row">${ofrecer ? `<button class="btn small primary" id="btn-compartir">Compartir con todos lo de este dispositivo</button>` : ""}<button class="btn small" id="btn-comprobar">Comprobar ahora</button></div>`;
@@ -1244,7 +1320,7 @@ function pintarInforme() {
   const hayStock = IDX.articulos.size && S.stock;
 
   $("#tiles").innerHTML = [
-    [pendientes, `movimientos pendientes (de ${mov.length})`], [mezcla.length, "pickings con problemas"], [vacios.length, "pickings sin su artículo"], [(S.hechos || []).length, "movimientos anotados"],
+    [pendientes, `movimientos pendientes (de ${mov.length})`], [mezcla.length, "pickings con problemas"], [vacios.length, "pickings sin su artículo"], [hechosAlmacen().length, "movimientos anotados"],
   ].map(([n, t]) => `<div class="tile"><b>${n}</b><span>${t}</span></div>`).join("");
 
   if (!hayStock) { ["#inf-mov", "#inf-mezcla", "#inf-vacios"].forEach((s) => ($(s).innerHTML = `<p class="muted">Carga el Excel de stock.</p>`)); return; }
@@ -1283,15 +1359,16 @@ function descargarExcel(filas, hoja, nombre) {
 function pintarCargas() {
   const lectura = soloLectura();
   $("#datos-titulo").textContent = lectura ? "Base de datos" : "Cargar Excel";
-  $("#datos-intro").textContent = lectura ? "La carga el responsable y se actualiza sola en este dispositivo."
-    : S.ajustes.codigo ? "Lo que cargues aquí se comparte con todos los dispositivos. Al cargar un archivo te pediré que confirmes qué columna es cada cosa (se recuerda para la próxima vez)."
+  const nombre = nombreAlmacen(S.ajustes.zona);
+  $("#datos-intro").textContent = lectura ? `La de ${nombre} la carga el responsable y se actualiza sola en este dispositivo.`
+    : S.ajustes.codigo ? `Lo que cargues aquí se guarda como la base de ${nombre} y se comparte con todos los dispositivos. Cada almacén tiene la suya. Al cargar un archivo te pediré que confirmes qué columna es cada cosa (se recuerda para la próxima vez).`
     : "Los datos se guardan solo en este dispositivo. Al cargar un archivo te pediré que confirmes qué columna es cada cosa (se recuerda para la próxima vez).";
   $("#card-ejemplo").classList.toggle("hidden", !!S.ajustes.codigo);
   $("#cargas").innerHTML = Object.entries(TIPOS).map(([t, def]) => {
     const d = S[t];
     return `<div style="border-top:1px solid var(--line);padding:12px 0">
       <div class="row" style="justify-content:space-between"><div><b>${def.titulo}</b>${t === "stock" ? "" : ' <span class="muted">(opcional)</span>'}<div class="muted">${def.desc}</div>
-      <div class="muted">${d ? `✅ ${S.ajustes.zona ? `${d.filas.filter((f) => enZona(f.ubicacion)).length} filas del almacén ${esc(S.ajustes.zona)} (de ${d.filas.length})` : `${d.filas.length} filas`} · ${esc(d.archivo)} · ${new Date(d.fecha).toLocaleString("es-ES")}` : "Sin cargar"}</div></div>
+      <div class="muted">${d ? `✅ ${S.ajustes.zona ? `${d.filas.filter((f) => enZona(f.ubicacion)).length} filas de ${esc(nombre)} (de ${d.filas.length})` : `${d.filas.length} filas`} · ${esc(d.archivo)} · ${new Date(d.fecha).toLocaleString("es-ES")}` : "Sin cargar"}</div></div>
       ${lectura ? "" : `<label class="btn small" style="flex:0 0 auto">📂 Cargar<input type="file" class="hidden" data-tipo="${t}" accept=".xlsx,.xls,.xlsm,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"></label>`}</div></div>`;
   }).join("");
   $("#cargas").querySelectorAll("input[type=file]").forEach((i) => i.addEventListener("change", (e) => leerExcel(e.target.dataset.tipo, e.target.files[0])));
@@ -1349,6 +1426,11 @@ function mostrarMapeo(tipo, archivo, hojas, hoja, cab, datos, abrir) {
     const falta = def.campos.filter(([c, , req]) => req && m[c] == null).map(([, n]) => n);
     if (falta.length) { toast("Falta indicar: " + falta.join(", ")); return; }
     const filas = convertir(m);
+    // que un Excel no acabe en el almacén equivocado
+    const delAlmacen = filas.filter((f) => enZona(f.ubicacion)).length;
+    const nombreAlm = nombreAlmacen(S.ajustes.zona);
+    if (!delAlmacen) { toast(`Este Excel no tiene ubicaciones de ${nombreAlm}. Comprueba el almacén elegido.`); return; }
+    if (tipo !== "vacias" && delAlmacen < filas.length / 2 && !confirm(`Solo ${delAlmacen} de ${filas.length} filas son de ${nombreAlm}. ¿Seguro que este Excel es de este almacén?`)) return;
     S[tipo] = { filas, archivo, fecha: Date.now() };
     // el tipo de una ubicación no cambia: se recuerda aunque luego deje de estar vacía
     for (const f of filas) { const t = tipoEsPicking(f.tipo); if (t !== null) S.tiposUbi[normUbi(f.ubicacion)] = t; }
@@ -1386,7 +1468,7 @@ function datosEjemplo() {
   const maestro = arts.map(([articulo, descripcion, ubicacion]) => ({ articulo, descripcion, ubicacion }));
   const vacias = [{ ubicacion: "01-005-1" }, { ubicacion: "01-003-1" }, { ubicacion: "02-014-3" }, { ubicacion: "02-014-4" }];
   // pasar al formato real del almacén: fila-hueco-nivel -> 08-FF-HHH-NN-1
-  const real = (u) => { const [f, h, n] = u.split("-"); return `08-${f}-${h}-0${n}-1`; };
+  const real = (u) => { const [f, h, n] = u.split("-"); return `${S.ajustes.zona}-${f}-${h}-0${n}-1`; };
   for (const x of [...stock, ...maestro, ...vacias]) x.ubicacion = real(x.ubicacion);
   return { stock, maestro, vacias };
 }
@@ -1447,9 +1529,8 @@ function pintarCodigo(paso = "") {
 function pintarAjustes() {
   $("#aj-digitos").value = S.ajustes.digitos;
   $("#aj-niveles").value = S.ajustes.niveles;
-  $("#aj-zona").value = S.ajustes.zona;
-  // la zona y los niveles son de la base compartida: solo los cambia el responsable
-  ["#aj-digitos", "#aj-niveles", "#aj-zona"].forEach((s) => { $(s).disabled = soloLectura(); });
+  // los niveles son de la base compartida: solo los cambia el responsable
+  ["#aj-digitos", "#aj-niveles"].forEach((s) => { $(s).disabled = soloLectura(); });
   pintarCodigo();
   $("#aj-tema").value = S.ajustes.tema;
   const ej = [...IDX.ubiOriginal.values()][0] || "01-001-1";
@@ -1461,6 +1542,7 @@ function pintarAjustes() {
 }
 function refrescar() {
   construirIndice();
+  pintarAlmacen();
   $("#aviso-sin-datos").classList.toggle("hidden", !!S.stock);
   pintarCargas(); pintarInforme(); pintarAjustes();
 }
@@ -1492,7 +1574,7 @@ $("#tab-movimientos").addEventListener("click", (e) => {
 });
 $("#mov-buscar").addEventListener("input", pintarMovimientos);
 $("#btn-export-feed").addEventListener("click", () => {
-  const todos = Object.values(S.feed.movs).filter((m) => !m.eliminado).sort((a, b) => a.llegada - b.llegada);
+  const todos = Object.values(S.feed.movs).filter((m) => !m.eliminado && enZona(m.hacia)).sort((a, b) => a.llegada - b.llegada);
   if (!todos.length) return toast("No hay movimientos");
   const filas = todos.map((m) => ({ "Fecha": new Date(m.fecha).toLocaleString("es-ES"), "Móvil": m.movil, "Artículo": m.articulo, "Descriptivo": m.descripcion, "Cajas": m.cajas, "Lote": m.lote, "Caducidad": verFecha(m.caducidad), "A su picking": codigoSistema(m.hacia), "Desde": m.desde, "UA": m.ua, "Estado": m.anulado ? "Borrado por el operario" : m.estado === "hecho" ? "Hecho" : "Por hacer" }));
   descargarExcel(filas, "Movimientos", `movimientos_compartidos_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -1507,13 +1589,15 @@ $("#buscar").addEventListener("input", (e) => buscar(e.target.value));
 $("#filtro-informe").addEventListener("input", pintarInforme);
 $("#btn-export-mov").addEventListener("click", exportarMovimientos);
 $("#btn-export-hechos").addEventListener("click", () => {
-  if (!S.hechos.length) return toast("No hay movimientos anotados");
-  const filas = S.hechos.map((h) => ({ "Fecha": new Date(h.fecha).toLocaleString("es-ES"), "Desde": h.desde, "Hacia": h.hacia, "Artículo": h.articulo, "Descriptivo": h.descripcion, "UA": h.ua, "Lote": h.lote, "Caducidad": verFecha(h.caducidad || ""), "Cajas movidas": h.cajas }));
+  const hechos = hechosAlmacen();
+  if (!hechos.length) return toast("No hay movimientos anotados");
+  const filas = hechos.map((h) => ({ "Fecha": new Date(h.fecha).toLocaleString("es-ES"), "Desde": h.desde, "Hacia": h.hacia, "Artículo": h.articulo, "Descriptivo": h.descripcion, "UA": h.ua, "Lote": h.lote, "Caducidad": verFecha(h.caducidad || ""), "Cajas movidas": h.cajas }));
   descargarExcel(filas, "Anotados", `movimientos_anotados_${new Date().toISOString().slice(0, 10)}.xlsx`);
 });
 $("#btn-borrar-hechos").addEventListener("click", async () => {
-  if (!S.hechos.length || !confirm("¿Borrar todos los movimientos anotados? Exporta antes si los necesitas.")) return;
-  const bloqueados = await quitarHechos(S.hechos); pintarInforme();
+  const hechos = hechosAlmacen();
+  if (!hechos.length || !confirm(`¿Borrar todos los movimientos anotados de ${nombreAlmacen(S.ajustes.zona)}? Exporta antes si los necesitas.`)) return;
+  const bloqueados = await quitarHechos(hechos); pintarInforme();
   if (!bloqueados) toast("Movimientos anotados borrados");
 });
 $("#btn-export-maestro").addEventListener("click", () => {
@@ -1542,18 +1626,28 @@ const guardarAjustes = () => {
   const antes = JSON.stringify(datosBase("ajustes"));
   S.ajustes.digitos = Math.max(1, Math.min(3, +$("#aj-digitos").value || 1));
   S.ajustes.niveles = $("#aj-niveles").value;
-  S.ajustes.zona = $("#aj-zona").value.trim();
   S.ajustes.tema = $("#aj-tema").value;
   guardar("ajustes"); aplicarTema(); construirIndice(); pintarCargas(); pintarInforme(); pintarAjustes();
   if (S.ajustes.responsable && JSON.stringify(datosBase("ajustes")) !== antes) subirBase(["ajustes"]);
 };
-["#aj-digitos", "#aj-niveles", "#aj-zona", "#aj-tema"].forEach((s) => $(s).addEventListener("change", guardarAjustes));
+["#aj-digitos", "#aj-niveles", "#aj-tema"].forEach((s) => $(s).addEventListener("change", guardarAjustes));
+$("#btn-almacen").addEventListener("click", () => mostrarElegir(true));
+$("#btn-cambiar-almacen").addEventListener("click", () => mostrarElegir(true));
+$("#elegir-lista").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  $("#elegir-almacen").classList.add("hidden");
+  if (b.dataset.cancelar) return;
+  try { sessionStorage.setItem("almacenElegido", "1"); } catch {}
+  cambiarAlmacen(b.dataset.almacen);
+});
 $("#btn-borrar-alias").addEventListener("click", async () => { if (!confirm("¿Borrar los alias aprendidos?")) return; S.alias = {}; await guardar("alias"); toast("Alias borrados"); });
 $("#btn-borrar-todo").addEventListener("click", async () => {
   if (!confirm("¿Borrar todos los Excel, alias y asignaciones de este móvil?")) return;
   // la cola no se borra: lo anotado sin cobertura se sigue enviando, y el historial compartido se vuelve a leer del servidor
   // la base compartida no se toca: este dispositivo la vuelve a descargar
-  for (const k of ["stock", "maestro", "vacias", "maestroManual", "alias", "mapeos", "tiposUbi", "hechos", "feed", "baseVer", "basePend"]) await store.del(k);
+  for (const k of ["maestroManual", "alias", "mapeos", "hechos", "feed"]) await store.del(k);
+  for (const k of POR_ALMACEN) for (const z of Object.keys(ALMACENES)) await store.del(`${k}@${z}`);
   S.stock = S.maestro = S.vacias = null; S.maestroManual = []; S.alias = {}; S.mapeos = {}; S.tiposUbi = {}; S.hechos = []; S.feed = { cursor: "", movs: {} }; S.baseVer = {}; S.basePend = [];
   refrescar(); pintarMovimientos(); toast("Datos borrados");
   sincronizarBase();
@@ -1566,8 +1660,12 @@ $("#btn-borrar-todo").addEventListener("click", async () => {
   refrescar();
   pintarRol();
   enviarCola();
+  // Se pregunta una vez cada vez que se entra; al recargar la página (por ejemplo, tras la cámara) no
+  let elegido = false;
+  try { elegido = !!sessionStorage.getItem("almacenElegido"); } catch {}
+  if (!elegido) mostrarElegir(false);
   await comprobarRol();
-  sincronizarBase();
+  if (elegido) sincronizarBase(); // si no, se sincroniza al elegir, sin descargar antes el almacén anterior
 })();
 </script>
 </body>
