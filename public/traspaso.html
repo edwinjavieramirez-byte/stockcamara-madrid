@@ -90,6 +90,7 @@ ol.pasos li { margin-bottom: 4px; }
 .doc .n { text-align: right; font-variant-numeric: tabular-nums; }
 .doc .grande { font-size: 15px; font-weight: 700; }
 .doc tr.tot td { font-weight: 700; border-top: 2px solid #000; border-bottom: 0; }
+.doc tr.pedido td { background: #fff4e5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .doc td.grupo { background: #e8f1f7; font-weight: 700; color: #2f7aa6; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .doc .caja { display: inline-block; width: 14px; height: 14px; border: 1.5px solid #000; }
 .doc h2 { font-size: 13px; margin: 14px 0 6px; color: #2f7aa6; }
@@ -148,7 +149,7 @@ ol.pasos li { margin-bottom: 4px; }
     </div>
     <div class="card no-print" id="card-sistema">
       <h2>2. Pasar al sistema</h2>
-      <p class="muted">Con lo calculado salen un <b>Excel con las cantidades para meter en el sistema</b> y una <b>hoja de traspaso</b> para preparar y firmar el envío. Solo van las referencias calculadas: las que están en rojo se quedan fuera hasta que se completen.</p>
+      <p class="muted">Con lo calculado salen un <b>Excel con las cantidades para meter en el sistema</b> y una <b>hoja de traspaso</b> para preparar y firmar el envío. El Excel sale <b>igual que el pedido</b>: las mismas hojas (PRIORITARIOS, Picking, PALETS…), columnas y orden, con la cantidad ya en bases completas y su tipo (CJ, UD o KG). Las que no se pueden enviar en bases (en rojo: les falta un dato de la ficha) van con la <b>cantidad del pedido</b>, marcadas «VA LO PEDIDO».</p>
       <div class="mapeo">
         <div><label class="f" for="sel-destino">Almacén que pide</label><select id="sel-destino" style="width:100%"></select></div>
         <div><label class="f" for="in-npedido">Nº de pedido o referencia (opcional)</label><input type="text" id="in-npedido" autocomplete="off" style="width:100%"></div>
@@ -594,8 +595,9 @@ function calcular(desdeExcel = false) {
         }
       }
       if (!(q.kg > 0) && !(q.cajas > 0) && !(q.ud > 0) && !(q.pal > 0)) { ignoradas.sinCantidad++; continue; }
-      if (!porRef.has(ref)) porRef.set(ref, { ref, codigo: String(fila[m.articulo]).trim(), kg: 0, cajasPed: 0, udPed: 0, palPed: 0, desc: "", lineas: 0, hoja: hoja.nombre, orden: orden++ });
-      const r = porRef.get(ref);
+      const clave = hoja.nombre + "\u0000" + ref; // cada hoja va por separado, como en el pedido
+      if (!porRef.has(clave)) porRef.set(clave, { ref, codigo: String(fila[m.articulo]).trim(), kg: 0, cajasPed: 0, udPed: 0, palPed: 0, desc: "", lineas: 0, hoja: hoja.nombre, orden: orden++ });
+      const r = porRef.get(clave);
       r.kg += Math.max(0, q.kg); r.cajasPed += Math.max(0, q.cajas); r.udPed += Math.max(0, q.ud); r.palPed += Math.max(0, q.pal);
       r.lineas++;
       if ("descripcion" in m && !r.desc) r.desc = String(fila[m.descripcion] || "").trim();
@@ -836,7 +838,8 @@ function leerCadena() {
     const f = masNueva(validas) || masNueva(filas);
     const base = t(f, "consumo").toUpperCase(), sob = t(f, "sob").toUpperCase(), dis = t(f, "dis").toUpperCase();
     const fSob = sob ? num(t(f, "fSob")) : null, fDis = dis ? num(t(f, "fDis")) : null;
-    if ((sob && !(fSob > 0)) || (dis && !(fDis > 0))) continue;
+    const desc = t(f, "desc") || filas.map((x) => t(x, "desc")).find(Boolean) || "";
+    if ((sob && !(fSob > 0)) || (dis && !(fDis > 0))) { if (desc) out.set(ref, { campos: {}, desc }); continue; }
     const bulto = dis || sob || base || "CJ"; // lo que se mueve: la caja; si no hay caja, la unidad (bolsa de hielo, tarta…)
     const basePorBulto = (sob ? fSob : 1) * (dis ? fDis : 1);
     const campos = { bulto };
@@ -844,7 +847,7 @@ function leerCadena() {
     if (sob === "UD") campos.udCaja = dis ? fDis : 1;
     else if (base === "UD") campos.udCaja = basePorBulto;
     if (validas.includes(f)) { campos.cajasBase = Math.round(num(t(f, "cajasFila"))); campos.basesPalet = Math.round(num(t(f, "filas"))); conBase++; }
-    out.set(ref, { campos, desc: t(f, "desc") });
+    out.set(ref, { campos, desc });
   }
   return { out, deducidas: 0, conBase, varias };
 }
@@ -931,6 +934,58 @@ $("#btn-export-ficha").addEventListener("click", () => {
   descargarExcel([["Ficha de bases", filas, ["Referencia", "Descripción", "Cajas por base", "Bases por palet", "Kg por caja", "Origen", "Último cambio"]]], `ficha_bases_${hoy()}.xlsx`);
 });
 // ---------- pasar al sistema ----------
+// Las que no se pueden enviar en bases (les falta un dato de la ficha) no se quedan fuera: van con lo que se pidió
+const HOJA_PEDIDO = "Van como en el pedido";
+const motivoPedido = (l) => (l.bases == null ? textoEstado(l) : "falta kg por caja").replace(/^./, (c) => c.toLowerCase());
+// El Excel para el sistema sale con las mismas hojas, columnas y orden que el pedido (PRIORITARIOS, Picking, PALETS…),
+// con la cantidad ya ajustada a bases completas y el tipo de cada una (CJ, UD o KG). Lo que no se ha podido calcular
+// se deja como venía y se marca en «Aviso».
+// descripción de un código: la de la ficha técnica; si no, la del stock del que envía o del que pide
+const descripcionDe = (ref) => (ref ? F.items[ref]?.desc || STOCK.porArt.get(ref)?.desc || STOCK_PIDE.porArt?.get(ref)?.desc || "" : "");
+function hojasComoPedido(unidad) {
+  const usados = new Set(["Detalle", HOJA_PEDIDO, "Datos del traspaso"]);
+  return hojasIncluidas().map((hoja) => {
+    const m = mapeoDeHoja(hoja);
+    const porRef = new Map(FILAS.filter((l) => l.hoja === hoja.nombre).map((l) => [l.ref, l]));
+    const ancho = Math.max(hoja.cab.length, ...hoja.filas.map((f) => f.length));
+    const cab = Array.from({ length: ancho }, (_, i) => hoja.cab[i] ?? "");
+    // la descripción va al lado del artículo; si el pedido ya trae columna de descripción, se rellena la suya
+    const conDesc = "descripcion" in m, junto = "articulo" in m ? m.articulo + 1 : 0;
+    const conDescripcion = (f, ref, l) => {
+      const d = (l?.desc || descripcionDe(ref)) ?? "";
+      if (conDesc) { if (!String(f[m.descripcion] ?? "").trim()) f[m.descripcion] = d; return f; }
+      return [...f.slice(0, junto), d, ...f.slice(junto)];
+    };
+    const filas = [[...conDescripcion([...cab], "", { desc: "Descripción" }), "Bases", "Cajas por base", "Pedido original", "Aviso"]];
+    const vistas = new Set();
+    for (const fila of hoja.filas) {
+      if (!fila.some((v) => String(v ?? "").trim())) continue;
+      const f = Array.from({ length: ancho }, (_, i) => fila[i] ?? "");
+      const ref = "articulo" in m ? normArt(fila[m.articulo]) : "";
+      const l = ref ? porRef.get(ref) : null;
+      if (!l) { filas.push([...conDescripcion(f, ref), "", "", "", ref ? "No se ha calculado: revisa la cantidad o la unidad" : ""]); continue; }
+      if (vistas.has(ref)) { filas.push([...conDescripcion(f, ref, l), "", "", "", "Repetida en esta hoja: su cantidad va sumada en la primera fila"]); continue; }
+      vistas.add(ref);
+      const q = l.bases != null ? cantidadSistema(l, unidad) : null;
+      // no se puede en bases completas: va la cantidad del pedido, tal cual
+      if (q == null) { filas.push([...conDescripcion(f, ref, l), "", l.cajasBase ?? "", textoPedido(l), `VA LO PEDIDO: ${motivoPedido(l)}`]); continue; }
+      const tipo = unidad === "CJ" ? l.bulto : "KG";
+      if ("cantidad" in m) {
+        if ("unidad" in m) { f[m.cantidad] = q; f[m.unidad] = tipo; }
+        else f[m.cantidad] = leerCantidad(fila[m.cantidad]).texto ? `${q} ${tipo}` : q;
+      } else {
+        if ("cajas" in m) f[m.cajas] = unidad === "CJ" ? q : "";
+        if ("kilos" in m) f[m.kilos] = unidad === "KG" ? q : "";
+      }
+      filas.push([...conDescripcion(f, ref, l), l.bases, l.cajasBase, textoPedido(l), l.problemas.join(" · ")]);
+    }
+    // nombre de hoja válido para Excel (máx. 31 caracteres, sin repetir)
+    let nombre = String(hoja.nombre).replace(/[\\/?*[\]:]/g, " ").slice(0, 31) || "Pedido";
+    for (let i = 2; usados.has(nombre); i++) nombre = `${String(hoja.nombre).slice(0, 27)} (${i})`;
+    usados.add(nombre);
+    return [nombre, filas];
+  });
+}
 const nombreAlm = (z) => ALMACENES[z] || (z ? `Almacén ${z}` : "");
 const listas = () => FILAS.filter((l) => l.bases != null);
 const pendientes = () => FILAS.filter((l) => l.bases == null);
@@ -951,13 +1006,13 @@ function pintarSistema() {
   const sinStock = ok.filter((l) => l.problemas.length).length;
   const avisos = [
     origen === destino ? "El almacén que pide es el mismo que el que envía." : "",
-    pend.length ? `${pend.length} ${pend.length === 1 ? "referencia queda fuera" : "referencias quedan fuera"} por falta de datos (en rojo en la tabla).` : "",
+    pend.length ? `${pend.length} ${pend.length === 1 ? "referencia no se puede enviar en bases: va" : "referencias no se pueden enviar en bases: van"} con la cantidad del pedido (en rojo en la tabla; si les pones las cajas por base, pasan a ir en bases).` : "",
     sinStock ? `${sinStock} ${sinStock === 1 ? "referencia va" : "referencias van"} aunque no haya stock suficiente: revísalas antes de grabar.` : "",
-    sinKg ? `${sinKg} sin kg por caja: en kilos quedan fuera; en cajas sí van.` : "",
+    sinKg ? `${sinKg} sin kg por caja: en kilos van con lo pedido; en cajas sí van en bases.` : "",
     variables ? `${variables} de peso variable: sus kilos son aproximados (media del stock). Mejor meterlas en cajas.` : "",
   ].filter(Boolean);
   $("#sistema-aviso").innerHTML = avisos.length ? `<div class="status" style="margin-top:10px">${avisos.map(esc).join("<br>")}</div>` : "";
-  $("#btn-sistema").disabled = $("#btn-hoja").disabled = !ok.length;
+  $("#btn-sistema").disabled = $("#btn-hoja").disabled = !FILAS.length;
 }
 const nombreArchivo = (base) => {
   const { origen, destino, npedido } = datosSistema();
@@ -967,23 +1022,25 @@ const nombreArchivo = (base) => {
 $("#btn-sistema").addEventListener("click", () => {
   const { origen, destino, npedido, unidad } = datosSistema();
   const ok = listas().filter((l) => cantidadSistema(l, unidad) != null);
-  if (!ok.length) { toast("No hay ninguna referencia calculada para pasar al sistema"); return; }
-  const sistema = ok.map((l) => ({
-    ...(npedido ? { "Nº pedido": npedido } : {}),
-    "Almacén origen": nombreAlm(origen), "Almacén destino": nombreAlm(destino),
-    "Material": l.codigo, "Descripción material": l.desc, "Cantidad": cantidadSistema(l, unidad), "Unidad": unidad === "CJ" ? l.bulto : "KG",
-  }));
-  const detalle = ok.map((l) => ({
+  if (!FILAS.length) { toast("No hay ninguna referencia para pasar al sistema"); return; }
+  const enBases = new Set(ok);
+  const detalle = FILAS.map((l) => enBases.has(l) ? {
     ...(PEDIDO.hojas.length > 1 ? { "Hoja": l.hoja } : {}),
     "Material": l.codigo, "Descripción material": l.desc, "Pedido": textoPedido(l), "Cajas por base": l.cajasBase,
     "Bases": l.bases, "Cajas": l.cajas, "Bulto": l.bulto, "Kg": l.kgEnv != null ? +l.kgEnv.toFixed(3) : "", "Palets": textoPalets(l.palets), "Aviso": l.problemas.join(" · "),
-  }));
-  const fuera = [...pendientes(), ...listas().filter((l) => cantidadSistema(l, unidad) == null)].map((l) => ({
+  } : {
     ...(PEDIDO.hojas.length > 1 ? { "Hoja": l.hoja } : {}),
-    "Material": l.codigo, "Descripción material": l.desc, "Pedido": textoPedido(l), "Motivo": textoEstado(l) === "Listo" ? "Falta kg por caja" : textoEstado(l),
+    "Material": l.codigo, "Descripción material": l.desc, "Pedido": textoPedido(l), "Cajas por base": l.cajasBase ?? "",
+    "Bases": "", "Cajas": "", "Bulto": "", "Kg": "", "Palets": "", "Aviso": `Va lo pedido: ${motivoPedido(l)}`,
+  });
+  const fuera = FILAS.filter((l) => !enBases.has(l)).map((l) => ({
+    ...(PEDIDO.hojas.length > 1 ? { "Hoja": l.hoja } : {}),
+    "Material": l.codigo, "Descripción material": l.desc, "Va (lo pedido)": textoPedido(l), "Por qué no va en bases": motivoPedido(l).replace(/^./, (c) => c.toUpperCase()),
   }));
-  descargarExcel([["Para el sistema", sistema], ["Detalle", detalle], ...(fuera.length ? [["No incluidas", fuera]] : [])], nombreArchivo("traspaso_sistema"));
-  toast(`Excel para el sistema: ${ok.length} referencias en ${unidad === "CJ" ? "cajas" : "kilos"}`);
+  const datos = [["Sale de", nombreAlm(origen)], ["Va a", nombreAlm(destino)], ...(npedido ? [["Nº pedido", npedido]] : []), ["Fecha", new Date().toLocaleDateString("es-ES")],
+    ["Cantidad en", unidad === "CJ" ? "Cajas (CJ, o UD si el artículo se mueve por unidad)" : "Kilos (KG)"]];
+  descargarExcel([...hojasComoPedido(unidad), ["Detalle", detalle], ...(fuera.length ? [[HOJA_PEDIDO, fuera]] : []), ["Datos del traspaso", datos]], nombreArchivo("traspaso_sistema"));
+  toast(`Excel para el sistema: ${hojasIncluidas().length} ${hojasIncluidas().length === 1 ? "hoja" : "hojas"} como el pedido, ${ok.length} en bases (${unidad === "CJ" ? "cajas" : "kilos"})${FILAS.length > ok.length ? ` y ${FILAS.length - ok.length} con lo pedido` : ""}`);
 });
 $("#btn-hoja").addEventListener("click", () => {
   const { origen, destino, npedido } = datosSistema();
@@ -997,17 +1054,19 @@ $("#btn-hoja").addEventListener("click", () => {
       <div><span>Sale de</span><b>${esc(nombreAlm(origen))}</b></div>
       <div><span>Va a</span><b>${esc(nombreAlm(destino))}</b></div>
       <div><span>Fecha</span><b>${esc(fecha)}</b></div>
-      <div><span>Referencias</span><b>${ok.length}</b></div>
+      <div><span>Referencias</span><b>${FILAS.length}${pend.length ? ` <small>(${pend.length} con lo pedido)</small>` : ""}</b></div>
       <div><span>Bases / cajas</span><b>${nf(sum("bases"))} bases · ${nf(sum("cajas"))} cajas</b></div>
       <div><span>Kilos${conKg ? "" : " (de las que se sabe el peso)"}</span><b>${nf(sum("kgEnv"), 1)} kg</b></div>
     </div>
     <table><thead><tr><th>Nº</th><th>Material</th><th>Descripción</th><th class="n">Bases</th><th class="n">Cajas / base</th><th class="n">Cajas</th><th class="n">Kg</th><th>Palets</th><th>Preparado</th></tr></thead>
-    <tbody>${ok.map((l, i) => `${PEDIDO.hojas.length > 1 && (i === 0 || ok[i - 1].hoja !== l.hoja) ? `<tr><td colspan="9" class="grupo">${esc(l.hoja)}</td></tr>` : ""}<tr><td>${i + 1}</td><td><b>${esc(l.codigo)}</b></td><td>${esc(l.desc)}${l.problemas.length ? `<br><i>⚠ ${esc(l.problemas.join(" · "))}</i>` : ""}</td>
-      <td class="n grande">${l.bases}</td><td class="n">${l.cajasBase}</td><td class="n grande">${esc(textoBultos(l.cajas, l.bulto))}</td><td class="n">${nf(l.kgEnv, 1)}</td><td>${esc(textoPalets(l.palets))}</td><td><span class="caja"></span></td></tr>`).join("")}
-    <tr class="tot"><td colspan="3">Total</td><td class="n">${nf(sum("bases"))}</td><td></td><td class="n">${nf(sum("cajas"))}</td><td class="n">${nf(sum("kgEnv"), 1)}</td><td colspan="2"></td></tr></tbody></table>
-    ${pend.length ? `<h2>No incluidas (faltan datos)</h2><table><thead><tr><th>Material</th><th>Descripción</th><th>Pedido</th><th>Motivo</th></tr></thead><tbody>${pend.map((l) => `<tr><td>${esc(l.codigo)}</td><td>${esc(l.desc)}</td><td>${esc(textoPedido(l))}</td><td>${esc(textoEstado(l))}</td></tr>`).join("")}</tbody></table>` : ""}
+    <tbody>${FILAS.map((l, i) => `${PEDIDO.hojas.length > 1 && (i === 0 || FILAS[i - 1].hoja !== l.hoja) ? `<tr><td colspan="9" class="grupo">${esc(l.hoja)}</td></tr>` : ""}${l.bases != null
+      ? `<tr><td>${i + 1}</td><td><b>${esc(l.codigo)}</b></td><td>${esc(l.desc)}${l.problemas.length ? `<br><i>⚠ ${esc(l.problemas.join(" · "))}</i>` : ""}</td>
+      <td class="n grande">${l.bases}</td><td class="n">${l.cajasBase}</td><td class="n grande">${esc(textoBultos(l.cajas, l.bulto))}</td><td class="n">${nf(l.kgEnv, 1)}</td><td>${esc(textoPalets(l.palets))}</td><td><span class="caja"></span></td></tr>`
+      : `<tr class="pedido"><td>${i + 1}</td><td><b>${esc(l.codigo)}</b></td><td>${esc(l.desc)}<br><i>Va lo pedido: ${esc(motivoPedido(l))}</i></td>
+      <td class="n">—</td><td class="n">${l.cajasBase ?? "—"}</td><td class="n grande" colspan="2">${esc(textoPedido(l))}</td><td></td><td><span class="caja"></span></td></tr>`}`).join("")}
+    <tr class="tot"><td colspan="3">Total en bases${pend.length ? ` <small>(sin las ${pend.length} que van con lo pedido)</small>` : ""}</td><td class="n">${nf(sum("bases"))}</td><td></td><td class="n">${nf(sum("cajas"))}</td><td class="n">${nf(sum("kgEnv"), 1)}</td><td colspan="2"></td></tr></tbody></table>
     <div class="doc-firmas"><div>Preparado por / fecha</div><div>Grabado en el sistema por</div><div>Recibido en destino por / fecha</div></div>
-    <div class="doc-pie">Bases completas, siempre igual o más de lo pedido. Generado con el Buscador de artículos de Garcimar.</div>`;
+    <div class="doc-pie">Bases completas, siempre igual o más de lo pedido.${pend.length ? " Las líneas en naranja van con la cantidad del pedido: no se pueden enviar en bases porque les falta un dato de la ficha." : ""} Generado con el Buscador de artículos de Garcimar.</div>`;
   document.body.classList.add("imprimir-doc");
   // el logo tiene que estar cargado antes de imprimir
   const img = $("#documento img");
