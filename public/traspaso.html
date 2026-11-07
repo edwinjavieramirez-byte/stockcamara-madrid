@@ -328,7 +328,8 @@ function pintarFicha() {
   if (SYNC.error) txt = `⚠️ ${SYNC.error}`;
   else if (pend) txt = `Guardando ${pend} ${pend === 1 ? "cambio" : "cambios"} para todos…`;
   else txt = "✅ Guardada en la base compartida. Solo el responsable puede verla y cambiarla.";
-  $("#ficha-estado").innerHTML = `<div><b>${nf(nBase)}</b> referencias con sus cajas por base${n > nBase ? ` <span class="muted">(${nf(n)} con algún dato)</span>` : ""}</div><div class="muted">${esc(txt)}</div>`;
+  const sinDesc = Object.values(F.items).filter((i) => (i.cajasBase || i.kgCaja) && !i.desc).length;
+  $("#ficha-estado").innerHTML = `<div><b>${nf(nBase)}</b> referencias con sus cajas por base${n > nBase ? ` <span class="muted">(${nf(n)} con algún dato)</span>` : ""}</div><div class="muted">${esc(txt)}</div>${sinDesc ? `<div class="status" style="margin-top:6px">⚠️ ${nf(sinDesc)} ${sinDesc === 1 ? "referencia de la ficha no tiene" : "referencias de la ficha no tienen"} descripción. Vuelve a importar la cadena logística (botón de abajo) para que salga el nombre de cada artículo.</div>` : ""}`;
 }
 
 // ---------- stock ----------
@@ -621,7 +622,7 @@ function calcular(desdeExcel = false) {
 function calcularLinea(r) {
   const fi = F.items[r.ref] || {};
   const st = infoStock(r.ref);
-  const l = { ...r, desc: r.desc || fi.desc || st?.desc || "", st, fi };
+  const l = { ...r, desc: r.desc || descripcionDe(r.ref), st, fi };
   // kg por caja: el de la ficha; si la ficha no lo tiene, el del stock (peso ÷ cajas del sistema)
   const stPide = !st?.kgCaja && STOCK_PIDE.zona !== STOCK.zona ? infoStock(r.ref, STOCK_PIDE) : null;
   l.kgCaja = fi.kgCaja || st?.kgCaja || stPide?.kgCaja || null;
@@ -694,7 +695,7 @@ function celdaInput(l, campo, dec) {
 function filaHTML(l) {
   const st = l.st;
   return `<td class="mono">${esc(l.codigo)}${PEDIDO.hojas.length > 1 ? `<div class="pista">${esc(l.hoja)}</div>` : ""}</td>
-    <td class="desc">${esc(l.desc)}</td>
+    <td class="desc">${l.desc ? esc(l.desc) : '<span class="muted">Sin descripción: no está en la ficha ni en el stock</span>'}</td>
     <td class="num" style="white-space:nowrap">${esc(textoPedido(l))}</td>
     ${celdaInput(l, "kgCaja", true)}${celdaInput(l, "cajasBase", false)}${celdaInput(l, "basesPalet", false)}
     <td class="num">${nf(l.kgBase, 2)}</td>
@@ -835,7 +836,8 @@ function leerCadena() {
     if (validas.length > 1) varias++;
     const fecha = (x) => { const v = "fecha" in c ? x[c.fecha] : null; return v instanceof Date ? v.getTime() / 864e5 + 25569 : num(v) || 0; };
     const masNueva = (lista) => [...lista].sort((a, b) => fecha(b) - fecha(a))[0];
-    const f = masNueva(validas) || masNueva(filas);
+    // sin cajas por fila: la más reciente de las de kilos o unidades; la de KN (1 × 1) no dice nada del formato
+    const f = masNueva(validas) || masNueva(filas.filter((x) => t(x, "consumo").toUpperCase() !== "KN" && (t(x, "dis") || t(x, "sob")))) || masNueva(filas);
     const base = t(f, "consumo").toUpperCase(), sob = t(f, "sob").toUpperCase(), dis = t(f, "dis").toUpperCase();
     const fSob = sob ? num(t(f, "fSob")) : null, fDis = dis ? num(t(f, "fDis")) : null;
     const desc = t(f, "desc") || filas.map((x) => t(x, "desc")).find(Boolean) || "";
