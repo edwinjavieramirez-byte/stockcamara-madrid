@@ -1,0 +1,950 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f2a3d">
+<link rel="icon" href="icon-192.png">
+<title>Traspaso por bases</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #f3f6f9; --card: #ffffff; --text: #14212b; --muted: #5d6b78; --line: #dde4ea;
+  --accent: #0b6fa4; --accent-ink: #ffffff; --ok: #1f8a4c; --ok-bg: #e5f5ec;
+  --warn: #a86400; --warn-bg: #fff3df; --bad: #c0362c; --bad-bg: #fde9e7; --chip: #eef3f7;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1820; --card: #15242f; --text: #e6eef4; --muted: #93a4b2; --line: #26394a;
+    --accent: #3aa3dc; --accent-ink: #06141d; --ok: #4cc283; --ok-bg: #12301f;
+    --warn: #f0a640; --warn-bg: #33260f; --bad: #f2786d; --bad-bg: #3a1714; --chip: #1d3242;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1820; --card: #15242f; --text: #e6eef4; --muted: #93a4b2; --line: #26394a;
+  --accent: #3aa3dc; --accent-ink: #06141d; --ok: #4cc283; --ok-bg: #12301f;
+  --warn: #f0a640; --warn-bg: #33260f; --bad: #f2786d; --bad-bg: #3a1714; --chip: #1d3242;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { position: sticky; top: 0; z-index: 5; background: #0f2a3d; color: #fff; padding-top: env(safe-area-inset-top); }
+.marca { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #fff; padding: 8px 16px; }
+.marca img { display: block; height: 44px; width: auto; }
+.marca span { color: #2f7aa6; font-size: 14px; font-weight: 700; text-align: right; }
+.barra { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 16px; }
+.barra h1 { margin: 0; font-size: 17px; }
+.barra a { color: #b9cbd8; font-size: 14px; text-decoration: none; white-space: nowrap; }
+main { padding: 16px; max-width: 1280px; margin: 0 auto 60px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+h2 { font-size: 17px; margin: 0 0 8px; }
+.muted { color: var(--muted); font-size: 14px; }
+p.muted { margin: 4px 0 10px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 10px; padding: 10px 14px; font: inherit; font-size: 15px; cursor: pointer; text-decoration: none; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.small { padding: 7px 11px; font-size: 14px; }
+.btn.on { border-color: var(--accent); background: var(--chip); font-weight: 600; }
+.hidden { display: none !important; }
+select, input[type=number], input[type=text] { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 15px; }
+label.f { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.mapeo { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin-top: 10px; }
+.mapeo select { width: 100%; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.tile .n { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tile .l { font-size: 13px; color: var(--muted); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 13px; font-weight: 600; background: var(--chip); white-space: nowrap; }
+.badge.ok { background: var(--ok-bg); color: var(--ok); }
+.badge.warn { background: var(--warn-bg); color: var(--warn); }
+.badge.bad { background: var(--bad-bg); color: var(--bad); }
+.status { padding: 10px 12px; border-radius: 10px; background: var(--chip); margin-top: 10px; font-size: 15px; }
+.status.bad { background: var(--bad-bg); color: var(--bad); }
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.tbl { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+.tbl th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 8px 6px; border-bottom: 2px solid var(--line); vertical-align: bottom; white-space: nowrap; }
+.tbl td { padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.tbl td.num, .tbl th.num { text-align: right; }
+.tbl td.bases { font-size: 18px; font-weight: 700; color: var(--accent); }
+.tbl tr.total td { font-weight: 700; border-top: 2px solid var(--line); border-bottom: 0; }
+.tbl input[type=number] { width: 86px; padding: 6px 8px; text-align: right; }
+.tbl input.falta { border-color: var(--bad); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.desc { min-width: 180px; max-width: 280px; }
+.pista { font-size: 12px; color: var(--muted); margin-top: 3px; max-width: 150px; }
+.pista button { border: 0; background: none; color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; padding: 0; cursor: pointer; text-decoration: underline; }
+.toast { position: fixed; left: 16px; right: 16px; bottom: 16px; background: #14212b; color: #fff; padding: 12px 14px; border-radius: 12px; z-index: 20; text-align: center; max-width: 520px; margin: 0 auto; }
+ol.pasos { margin: 6px 0 0; padding-left: 20px; font-size: 14px; color: var(--muted); }
+ol.pasos li { margin-bottom: 4px; }
+/* hoja de traspaso: solo existe al imprimir */
+#documento { display: none; }
+.doc { font: 12px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #000; }
+.doc-cab { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #2f7aa6; padding-bottom: 8px; margin-bottom: 10px; }
+.doc-cab img { height: 40px; }
+.doc-cab h1 { margin: 0; font-size: 18px; color: #2f7aa6; text-align: right; }
+.doc-datos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 16px; margin-bottom: 12px; }
+.doc-datos div span { display: block; font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: .3px; }
+.doc-datos div b { font-size: 13px; }
+.doc table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+.doc th { background: #2f7aa6; color: #fff; font-size: 11px; text-align: left; padding: 5px 6px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.doc td { border-bottom: 1px solid #bbb; padding: 5px 6px; vertical-align: top; }
+.doc .n { text-align: right; font-variant-numeric: tabular-nums; }
+.doc .grande { font-size: 15px; font-weight: 700; }
+.doc tr.tot td { font-weight: 700; border-top: 2px solid #000; border-bottom: 0; }
+.doc .caja { display: inline-block; width: 14px; height: 14px; border: 1.5px solid #000; }
+.doc h2 { font-size: 13px; margin: 14px 0 6px; color: #2f7aa6; }
+.doc-firmas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 28px; }
+.doc-firmas div { border-top: 1px solid #000; padding-top: 4px; font-size: 11px; }
+.doc-pie { margin-top: 18px; font-size: 10px; color: #666; }
+@media print {
+  body.imprimir-doc > header, body.imprimir-doc > main { display: none !important; }
+  body.imprimir-doc #documento { display: block; }
+  @page { margin: 12mm; }
+  header, .no-print, .pista button { display: none !important; }
+  body { background: #fff; color: #000; }
+  main { max-width: none; padding: 0; }
+  .card { border: 0; padding: 0; }
+  .tbl input[type=number] { border: 0; width: auto; padding: 0; background: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="marca"><img src="logo-garcimar.png" alt="Garcimar" width="104" height="44"><span>Buscador de artículos</span></div>
+  <div class="barra"><h1>📦 Traspaso por bases</h1><a href="index.html">← Volver a la app</a></div>
+</header>
+
+<main>
+  <div class="card no-print">
+    <h2>1. Carga el pedido de traspaso</h2>
+    <p class="muted">Un Excel con la <b>referencia</b> y lo que se pide de cada una, en <b>kilos</b>, en <b>cajas</b> o mezclado. Si la columna Cantidad trae la unidad («20 CJ», «150 KG»), se reconoce sola; también vale con columnas separadas de kilos y cajas. Por defecto envía Barcelona y pide Madrid. Si además trae kg por caja, cajas por base o bases por palet, se guardan en la ficha. El archivo no sale de este equipo: el cálculo se hace aquí.</p>
+    <div class="row">
+      <label class="btn primary">📂 Cargar pedido (Excel)<input type="file" id="in-pedido" class="hidden" accept=".xlsx,.xls,.xlsm,.csv"></label>
+      <button class="btn small" id="btn-plantilla">⬇️ Plantilla del pedido</button>
+      <span style="flex:1"></span>
+      <label class="f" for="sel-almacen" style="margin:0">Almacén que envía</label>
+      <select id="sel-almacen"></select>
+    </div>
+    <div id="estado-stock" class="muted" style="margin-top:8px"></div>
+    <div id="mapeo" class="hidden"></div>
+  </div>
+
+  <div id="resultado" class="hidden">
+    <div class="tiles" id="tiles"></div>
+    <div class="card">
+      <div class="row no-print" style="justify-content:space-between;margin-bottom:10px">
+        <div class="row">
+          <button class="btn small on" data-filtro="todas">Todas</button>
+          <button class="btn small" data-filtro="revisar">Por revisar</button>
+        </div>
+        <div class="row">
+          <button class="btn small" id="btn-exportar">⬇️ Excel con el detalle</button>
+          <button class="btn small" id="btn-imprimir">🖨️ Imprimir</button>
+        </div>
+      </div>
+      <div id="avisos-pedido" style="margin-bottom:10px"></div>
+      <p class="muted no-print" id="nota-tabla"></p>
+      <div class="scroll"><table class="tbl" id="tabla"></table></div>
+    </div>
+    <div class="card no-print" id="card-sistema">
+      <h2>2. Pasar al sistema</h2>
+      <p class="muted">Con lo calculado salen un <b>Excel con las cantidades para meter en el sistema</b> y una <b>hoja de traspaso</b> para preparar y firmar el envío. Solo van las referencias calculadas: las que están en rojo se quedan fuera hasta que se completen.</p>
+      <div class="mapeo">
+        <div><label class="f" for="sel-destino">Almacén que pide</label><select id="sel-destino" style="width:100%"></select></div>
+        <div><label class="f" for="in-npedido">Nº de pedido o referencia (opcional)</label><input type="text" id="in-npedido" autocomplete="off" style="width:100%"></div>
+        <div><label class="f" for="sel-unidad-sis">Cantidad para el sistema en</label><select id="sel-unidad-sis" style="width:100%"><option value="CJ">Cajas (CJ)</option><option value="KG">Kilos (KG)</option></select></div>
+      </div>
+      <div id="sistema-aviso"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="btn-sistema">⬇️ Excel para el sistema</button>
+        <button class="btn" id="btn-hoja">📄 Hoja de traspaso (imprimir o PDF)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card no-print">
+    <h2>Ficha de bases</h2>
+    <p class="muted">Lo que se sabe de cada código. El <b>kg por caja</b> sale solo del stock (peso ÷ cajas). Las <b>cajas por base</b> salen de la ficha técnica: impórtala aquí. Si cambia el formato de un artículo, búscalo abajo y cambia sus cajas por base; queda guardado para la próxima vez. Las bases por palet son opcionales: sirven para decir cuántos palets completos salen.</p>
+    <div id="ficha-estado"></div>
+    <div class="row" style="margin-top:10px">
+      <label class="btn small" id="lbl-import">📂 Importar ficha técnica (Excel)<input type="file" id="in-ficha" class="hidden" accept=".xlsx,.xls,.xlsm,.csv"></label>
+      <button class="btn small" id="btn-export-ficha">⬇️ Exportar ficha</button>
+    </div>
+    <div id="ficha-mapeo" class="hidden" style="margin-top:10px"></div>
+    <label class="f" for="ficha-buscar" style="margin-top:14px">Buscar una referencia para ver o cambiar sus cajas por base (si cambia el formato)</label>
+    <input type="search" id="ficha-buscar" placeholder="Código o nombre, p. ej. 100710 o gulas" autocomplete="off" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit">
+    <div id="ficha-lista" style="margin-top:8px"></div>
+    <ol class="pasos">
+      <li>Pedido en kilos: cajas necesarias = kilos ÷ kg por caja, redondeado hacia arriba. Pedido en cajas: esas cajas. Si una referencia viene de las dos formas, se suman.</li>
+      <li>Bases = cajas necesarias ÷ cajas por base, redondeado hacia arriba. Siempre se envía igual o más de lo pedido, nunca menos.</li>
+      <li>Las cajas por base salen siempre de la ficha: nunca se adivinan. Si una referencia no las tiene, sale en rojo hasta que se apuntan.</li>
+    </ol>
+  </div>
+</main>
+<div id="documento" class="doc"></div>
+
+<script>
+"use strict";
+// ---------- utilidades (las mismas que la app) ----------
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const norm = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const normUbi = (s) => String(s ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const normArt = (s) => String(s ?? "").trim().replace(/\.0+$/, "").replace(/^0+(?=\d)/, "").toUpperCase();
+const ALMACENES = { "08": "Garcimar Madrid", "01": "Garcimar Barcelona", "02": "Garcimar Málaga" };
+const ENVIA = "01", PIDE = "08"; // Barcelona distribuye: los traspasos van de Barcelona a Madrid
+const nf = (n, d = 0) => (n == null || !isFinite(n) ? "" : n.toLocaleString("es-ES", { maximumFractionDigits: d, minimumFractionDigits: 0 }));
+const hoy = () => new Date().toISOString().slice(0, 10);
+const EPS = 1e-9; // para que 100 kg / 10 kg sean 10 cajas y no 11 por los decimales
+const arriba = (x) => Math.ceil(x - EPS);
+function toast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2800);
+}
+// "1.234,5", "12,5", "12.5 kg", 12.5 → número
+function num(v) {
+  if (typeof v === "number") return isFinite(v) ? v : null;
+  let s = String(v ?? "").trim().replace(/\s|kgs?|kilos?/gi, "");
+  if (!s) return null;
+  if (s.includes(",") && s.includes(".")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (s.includes(",")) s = s.replace(",", ".");
+  const n = parseFloat(s);
+  return isFinite(n) ? n : null;
+}
+const ls = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+// ---------- almacenamiento: la misma base del dispositivo que usa la app ----------
+const idb = (() => {
+  let dbp;
+  try {
+    dbp = new Promise((res, rej) => {
+      const r = indexedDB.open("stock-camara", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("kv");
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  } catch { dbp = Promise.reject(); }
+  dbp.catch(() => {});
+  const tx = async (modo, fn) => {
+    const db = await dbp;
+    return new Promise((res, rej) => {
+      const t = db.transaction("kv", modo);
+      const q = fn(t.objectStore("kv"));
+      t.oncomplete = () => res(q && q.result);
+      t.onerror = () => rej(t.error);
+    });
+  };
+  return {
+    async get(k) { try { return await tx("readonly", (s) => s.get(k)); } catch { return undefined; } },
+    async set(k, v) { try { await tx("readwrite", (s) => s.put(v, k)); } catch {} },
+  };
+})();
+
+// ---------- estado ----------
+let AJ = { codigo: "", responsable: false, zona: "08", tema: "" };
+// ficha: items[ref] = { kgCaja, cajasBase, basesPalet, desc, t, por }; ver = versión compartida;
+// pendientes[ref] = lo cambiado en este equipo que aún no ha llegado a la base compartida
+let F = { items: {}, ver: null, pendientes: {} };
+let PEDIDO = null; // { archivo, cab, filas, mapeo, unidadDef }
+let FILAS = []; // líneas calculadas
+let STOCK = { zona: "", filas: [], origen: "", porArt: new Map() };
+let FILTRO = "todas";
+
+const guardarFicha = () => idb.set("fichaBases", F);
+
+// ---------- base compartida ----------
+async function api(body) {
+  const r = await fetch("/api/base", { method: "POST", headers: { "content-type": "application/json", "x-app-code": AJ.codigo || "" }, body: JSON.stringify(body) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || `No se ha podido conectar con la base compartida (error ${r.status}). Se usa la copia de este equipo.`);
+  return d;
+}
+// lo de la base compartida, con lo pendiente de este equipo por encima
+function aplicarServidor(items) {
+  F.items = { ...(items || {}) };
+  for (const [ref, c] of Object.entries(F.pendientes)) F.items[ref] = { ...(F.items[ref] || {}), ...c };
+}
+let SYNC = { error: "" };
+let colaSync = Promise.resolve();
+const sincronizar = () => (colaSync = colaSync.then(pasoSync));
+async function pasoSync() {
+  if (!AJ.codigo) { pintarFicha(); return; }
+  const antes = JSON.stringify(F.items);
+  try {
+    const refs = Object.keys(F.pendientes);
+    // de 1000 en 1000, para que un listado grande no supere lo que acepta el servidor
+    for (let i = 0; i < refs.length; i += 1000) {
+      const lote = Object.fromEntries(refs.slice(i, i + 1000).map((r) => [r, F.pendientes[r]]));
+      const d = await api({ accion: "ficha", almacen: AJ.zona, items: lote });
+      for (const r of Object.keys(lote)) if (F.pendientes[r] === lote[r]) delete F.pendientes[r];
+      F.ver = d.version;
+      aplicarServidor(d.items);
+    }
+    const r = await api({ accion: "estado", almacen: AJ.zona });
+    const meta = r.metas?.bases;
+    if (meta && meta.version !== F.ver) {
+      const d = await api({ accion: "descargar", almacen: AJ.zona, tipo: "bases" });
+      aplicarServidor(d.datos?.items);
+      F.ver = meta.version;
+    }
+    await guardarFicha();
+    SYNC = { error: "" };
+  } catch (e) {
+    SYNC.error = e instanceof TypeError ? "Sin conexión: se usa la copia de este equipo y se guardará al volver la conexión." : e.message;
+  }
+  if (JSON.stringify(F.items) !== antes && PEDIDO) calcular();
+  pintarFicha();
+}
+let tSubida = 0;
+function cambioFicha() {
+  guardarFicha();
+  pintarFicha();
+  clearTimeout(tSubida);
+  tSubida = setTimeout(sincronizar, 800);
+}
+// Esta página es solo del responsable (se comprueba al abrirla), así que quien la usa puede cambiar la ficha
+const puedeEditar = () => !!(AJ.codigo && AJ.responsable);
+// origen: "importada" (de la ficha técnica) o "mano" (corregida en la tabla)
+function ponerFicha(ref, campos, desc, origen = "mano") {
+  if (!puedeEditar()) return false;
+  const prev = F.items[ref] || {};
+  const d = desc || prev.desc || "";
+  F.items[ref] = { ...prev, ...campos, desc: d, t: Date.now(), por: origen === "importada" ? "Ficha técnica" : "Cambiada a mano" };
+  if (AJ.codigo) F.pendientes[ref] = { ...(F.pendientes[ref] || {}), ...campos, ...(d ? { desc: d } : {}), origen };
+  return true;
+}
+
+function pintarFicha() {
+  const n = Object.values(F.items).filter((i) => i.cajasBase || i.kgCaja || i.basesPalet).length;
+  const nBase = Object.values(F.items).filter((i) => i.cajasBase).length;
+  const pend = Object.keys(F.pendientes).length;
+  let txt;
+  if (SYNC.error) txt = `⚠️ ${SYNC.error}`;
+  else if (pend) txt = `Guardando ${pend} ${pend === 1 ? "cambio" : "cambios"} para todos…`;
+  else txt = "✅ Guardada en la base compartida. Solo el responsable puede verla y cambiarla.";
+  $("#ficha-estado").innerHTML = `<div><b>${nf(nBase)}</b> referencias con sus cajas por base${n > nBase ? ` <span class="muted">(${nf(n)} con algún dato)</span>` : ""}</div><div class="muted">${esc(txt)}</div>`;
+}
+
+// ---------- stock ----------
+// El stock de un almacén: el de este equipo, o el de la base compartida si es más nuevo
+async function leerStock(z) {
+  let datos = await idb.get(`stock@${z}`);
+  let origen = datos ? "este equipo" : "";
+  if (AJ.codigo) {
+    try {
+      const ver = (await idb.get(`baseVer@${z}`))?.stock;
+      const r = await api({ accion: "estado", almacen: z });
+      if (r.metas?.stock && r.metas.stock.version !== ver) {
+        const d = await api({ accion: "descargar", almacen: z, tipo: "stock" });
+        if (d.datos?.filas) { datos = d.datos; origen = "base compartida"; }
+      }
+    } catch {}
+  }
+  const zN = normUbi(z);
+  const filas = (datos?.filas || []).filter((f) => normUbi(f.ubicacion).startsWith(zN));
+  const porArt = new Map();
+  for (const f of filas) {
+    const k = normArt(f.articulo);
+    if (!porArt.has(k)) porArt.set(k, { desc: f.descripcion || "", filas: [] });
+    porArt.get(k).filas.push(f);
+  }
+  return { zona: z, filas, porArt, origen, fecha: datos?.fecha };
+}
+// Stock del almacén que pide: solo para sacar el kg por caja de lo que no esté en el stock del que envía
+let STOCK_PIDE = { zona: "", filas: [], porArt: new Map() };
+async function cargarStockPide(z) {
+  if (STOCK_PIDE.zona === z) return;
+  STOCK_PIDE = { zona: z, filas: [], porArt: new Map() };
+  const st = await leerStock(z);
+  if (STOCK_PIDE.zona !== z) return;
+  STOCK_PIDE = st;
+  if (PEDIDO) calcular();
+}
+async function cargarStock(z) {
+  STOCK = { zona: z, filas: [], origen: "", porArt: new Map() };
+  $("#estado-stock").textContent = "Buscando el stock…";
+  const st = await leerStock(z);
+  if (STOCK.zona !== z) return; // se ha cambiado de almacén mientras tanto
+  STOCK = st;
+  const conPeso = STOCK.filas.some((f) => num(f.peso) > 0);
+  $("#estado-stock").innerHTML = STOCK.filas.length
+    ? `Stock de <b>${esc(ALMACENES[z] || z)}</b>: ${nf(STOCK.porArt.size)} referencias (${esc(st.origen)}${st.fecha ? `, ${new Date(st.fecha).toLocaleDateString("es-ES")}` : ""}). De él salen las cajas disponibles y, si la ficha no lo tiene, el kg por caja (peso ÷ cajas).` +
+      (conPeso ? "" : ` <span class="badge warn">Sin la columna Peso</span> Vuelve a cargar el Excel de stock de ${esc(ALMACENES[z] || z)} en la app (pestaña Datos) para que el kg por caja salga solo.`)
+    : `No hay stock de <b>${esc(ALMACENES[z] || z)}</b> ${AJ.codigo ? "en la base compartida" : "en este equipo"}: no se comprueba si hay cajas. Para tenerlo, en la app elige ${esc(ALMACENES[z] || z)} y carga su Excel de stock en la pestaña Datos.`;
+  if (PEDIDO) calcular();
+}
+// Lo que el stock dice de una referencia: cajas disponibles y kg por caja (peso ÷ cajas del sistema)
+function infoStock(ref, st = STOCK) {
+  const a = st.porArt.get(ref);
+  if (!a) return null;
+  let disp = 0, pesoT = 0, cajasT = 0;
+  const ratios = [];
+  for (const f of a.filas) {
+    const c = num(f.cajas);
+    if (!(c > 0)) continue;
+    const p = num(f.peso);
+    if (p > 0) { pesoT += p; cajasT += c; ratios.push(p / c); }
+    const s = String(f.situacion ?? "").trim();
+    if (!s || s === "100") disp += c;
+  }
+  const kgCaja = cajasT ? +(pesoT / cajasT).toFixed(3) : null; // media si es de peso variable
+  const variable = ratios.length > 1 && Math.max(...ratios) - Math.min(...ratios) > 0.05 * Math.max(...ratios);
+  return { disp, desc: a.desc, kgCaja, variable };
+}
+// ---------- lectura de los Excel (pedido y ficha técnica) ----------
+const CAMPOS_PEDIDO = [
+  ["articulo", "Referencia", true], ["descripcion", "Descripción"],
+  ["kilos", "Kilos pedidos"], ["cajas", "Cajas pedidas"], ["cantidad", "Cantidad (p. ej. 20 CJ o 150 KG)"], ["unidad", "Unidad, si va en otra columna"],
+  ["kgCaja", "Kg por caja"], ["cajasBase", "Cajas por base"], ["basesPalet", "Bases por palet"],
+];
+const CAMPOS_FICHA = [
+  ["articulo", "Referencia", true], ["descripcion", "Descripción"], ["cajasBase", "Cajas por base"],
+  ["basesPalet", "Bases por palet"], ["cajasPalet", "Cajas por palet"], ["kgCaja", "Kg por caja"],
+];
+function campoDe(cab) {
+  const h = norm(cab);
+  if (!h) return null;
+  const caja = /\b(caja|cajas|bulto|bultos|cj|cjs)\b/.test(h), base = /\b(base|bases|capa|capas|manto|mantos|piso|pisos)\b/.test(h);
+  const palet = /palet|pallet/.test(h), peso = /\b(kg|kgs|kilo|kilos|peso)\b/.test(h);
+  if (peso && caja) return "kgCaja";
+  if (caja && base) return "cajasBase";
+  if (base && palet) return "basesPalet";
+  if (caja && palet) return "cajasPalet";
+  if (peso && !base && !palet) return "kilos";
+  if (caja) return "cajas";
+  if (/^(unidad|um|umb|uom|u m|ud|unidad de medida|unidad medida|ud medida|medida)$/.test(h)) return "unidad";
+  if (/\b(cantidad|cant|solicitad[oa]s?|pedid[oa]s?)\b/.test(h)) return "cantidad";
+  if (/descrip|nombre|denomin|designa/.test(h)) return "descripcion";
+  if (/articulo|referencia|\bref\b|codigo|\bcod\b|material|sku/.test(h)) return "articulo";
+  return null;
+}
+function adivinar(cab, campos) {
+  const validos = new Set(campos.map((c) => c[0]));
+  const mapeo = {};
+  cab.forEach((h, i) => { const c = campoDe(h); if (c && validos.has(c) && !(c in mapeo)) mapeo[c] = i; });
+  return mapeo;
+}
+// "KG", "Kilos" → kg; "CJ", "Cajas", "Bultos" → cajas; otra unidad (UN, BOL…) no se sabe convertir
+function unidadDe(v) {
+  const h = norm(v).replace(/\s/g, "");
+  if (/^(kg|kgs|k|kilo|kilos|kilogramo|kilogramos|kgm)$/.test(h)) return "kg";
+  if (/^(cj|cjs|caja|cajas|ca|cs|bulto|bultos|bul|bto|ct|ctn|car|carton|box)$/.test(h)) return "cajas";
+  return null;
+}
+// «20 CJ», «150 kg», «CJ 20», «1.234,5 KG» o un número solo → { q: cantidad, texto: unidad escrita ("" si no hay) }
+function leerCantidad(v) {
+  if (typeof v === "number") return { q: v, texto: "" };
+  const t = String(v ?? "").trim();
+  const m = t.match(/\d[\d.,]*/);
+  if (!m) return { q: null, texto: "" };
+  const texto = (t.slice(0, m.index) + " " + t.slice(m.index + m[0].length)).replace(/[^A-Za-zÀ-ÿ]+/g, " ").trim();
+  return { q: num(m[0]), texto };
+}
+async function leerHoja(file) {
+  const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true });
+  // la hoja con más columnas reconocidas, y en ella la fila de cabecera (puede haber un título encima)
+  let mejor = null;
+  for (const nombre of wb.SheetNames) {
+    const filas = XLSX.utils.sheet_to_json(wb.Sheets[nombre], { header: 1, raw: true, defval: "" });
+    for (let r = 0; r < Math.min(filas.length, 15); r++) {
+      const p = (filas[r] || []).filter((v) => typeof v === "string" && campoDe(v)).length;
+      if (!mejor || p > mejor.p) mejor = { p, filas, hr: r };
+    }
+  }
+  if (!mejor || !mejor.filas.length) throw new Error("El archivo está vacío.");
+  const cab = (mejor.filas[mejor.hr] || []).map((h, i) => String(h).trim() || `Columna ${i + 1}`);
+  return { cab, filas: mejor.filas.slice(mejor.hr + 1), archivo: file.name };
+}
+// Desplegables para confirmar qué columna es cada dato; lo corregido a mano se recuerda por el nombre de la columna
+function selectsMapeo(campos, cab, mapeo) {
+  const opciones = (c) => `<option value="">—</option>` + cab.map((h, i) => `<option value="${i}" ${mapeo[c] === i ? "selected" : ""}>${esc(h)}</option>`).join("");
+  return `<div class="mapeo">${campos.map(([c, n, req]) => `<div><label class="f">${n}${req ? " *" : " (opcional)"}</label><select data-campo="${c}">${opciones(c)}</select></div>`).join("")}</div>`;
+}
+function escucharMapeo(box, cab, mapeo, claveLs, alCambiar) {
+  box.querySelectorAll("select[data-campo]").forEach((s) => s.addEventListener("change", () => {
+    const c = s.dataset.campo;
+    if (s.value === "") delete mapeo[c]; else mapeo[c] = +s.value;
+    ls.set(claveLs, Object.fromEntries(Object.entries(mapeo).map(([k, i]) => [k, cab[i]])));
+    alCambiar();
+  }));
+}
+function mapeoRecordado(cab, campos, claveLs) {
+  const mapeo = adivinar(cab, campos);
+  for (const [c, nombre] of Object.entries(ls.get(claveLs) || {})) {
+    const i = cab.indexOf(nombre);
+    if (i >= 0 && campos.some((x) => x[0] === c)) mapeo[c] = i;
+  }
+  return mapeo;
+}
+
+// ---------- pedido ----------
+async function cargarPedido(file) {
+  if (!file) return;
+  try {
+    const h = await leerHoja(file);
+    PEDIDO = { ...h, mapeo: mapeoRecordado(h.cab, CAMPOS_PEDIDO, "traspaso-mapeo"), unidadDef: ls.get("traspaso-unidad") || "kg" };
+    pintarMapeo();
+    calcular(true);
+  } catch (e) {
+    console.error(e);
+    toast("No se ha podido leer el Excel: " + e.message);
+  }
+}
+function pintarMapeo() {
+  const box = $("#mapeo");
+  box.classList.remove("hidden");
+  const m = PEDIDO.mapeo;
+  // solo se pregunta la unidad si hay cantidades sin ella (ni en la celda ni en otra columna)
+  const sinUnidad = "cantidad" in m && !("unidad" in m) && PEDIDO.filas.some((f) => { const c = leerCantidad(f[m.cantidad]); return c.q > 0 && !c.texto; });
+  box.innerHTML = `<div class="status"><b>${esc(PEDIDO.archivo)}</b> · ${PEDIDO.filas.length} filas. Comprueba que cada dato sale de su columna. Basta con una de estas: kilos, cajas o cantidad.</div>
+    ${selectsMapeo(CAMPOS_PEDIDO, PEDIDO.cab, m)}
+    ${sinUnidad ? `<div style="margin-top:10px"><label class="f">Hay cantidades sin unidad: esas están en</label><select id="sel-unidad"><option value="kg" ${PEDIDO.unidadDef === "kg" ? "selected" : ""}>Kilos</option><option value="cajas" ${PEDIDO.unidadDef === "cajas" ? "selected" : ""}>Cajas</option></select></div>` : ""}`;
+  escucharMapeo(box, PEDIDO.cab, m, "traspaso-mapeo", () => { pintarMapeo(); calcular(true); });
+  $("#sel-unidad")?.addEventListener("change", (e) => { PEDIDO.unidadDef = e.target.value; ls.set("traspaso-unidad", e.target.value); calcular(); });
+}
+
+// ---------- cálculo ----------
+// desdeExcel: pasa a la ficha los datos de kg/caja, cajas/base y bases/palet que traiga el pedido
+function calcular(desdeExcel = false) {
+  if (!PEDIDO) return;
+  const m = PEDIDO.mapeo;
+  if (!("articulo" in m) || !["kilos", "cajas", "cantidad"].some((c) => c in m)) {
+    $("#resultado").classList.add("hidden");
+    toast("Indica qué columna es la referencia y cuál lo pedido (kilos, cajas o cantidad)");
+    return;
+  }
+  const porRef = new Map();
+  const ignoradas = { sinCantidad: 0, unidades: new Map() };
+  let nuevos = 0;
+  for (const fila of PEDIDO.filas) {
+    const ref = normArt(fila[m.articulo]);
+    if (!ref) continue;
+    let kg = "kilos" in m ? num(fila[m.kilos]) || 0 : 0;
+    let cj = "cajas" in m ? num(fila[m.cajas]) || 0 : 0;
+    if ("cantidad" in m) {
+      const c = leerCantidad(fila[m.cantidad]);
+      if (c.q > 0) {
+        // manda la unidad escrita en la propia celda («20 CJ»); si no, la de la columna de unidad; si no, la elegida
+        const texto = c.texto || ("unidad" in m ? String(fila[m.unidad] ?? "").trim() : "");
+        const u = c.texto ? unidadDe(c.texto) : "unidad" in m ? unidadDe(texto) : PEDIDO.unidadDef;
+        if (u === "kg") kg += c.q;
+        else if (u === "cajas") cj += c.q;
+        else { const k = texto || "(vacía)"; ignoradas.unidades.set(k, (ignoradas.unidades.get(k) || 0) + 1); continue; }
+      }
+    }
+    if (!(kg > 0) && !(cj > 0)) { ignoradas.sinCantidad++; continue; }
+    if (!porRef.has(ref)) porRef.set(ref, { ref, codigo: String(fila[m.articulo]).trim(), kg: 0, cajasPed: 0, desc: "", lineas: 0 });
+    const r = porRef.get(ref);
+    r.kg += kg > 0 ? kg : 0;
+    r.cajasPed += cj > 0 ? cj : 0;
+    r.lineas++;
+    if ("descripcion" in m && !r.desc) r.desc = String(fila[m.descripcion] || "").trim();
+    if (desdeExcel && puedeEditar()) {
+      const campos = {};
+      for (const c of ["kgCaja", "cajasBase", "basesPalet"]) {
+        if (!(c in m)) continue;
+        const v = num(fila[m[c]]);
+        if (v > 0 && v !== F.items[ref]?.[c]) campos[c] = c === "kgCaja" ? v : Math.round(v);
+      }
+      if (Object.keys(campos).length && ponerFicha(ref, campos, r.desc, "importada")) nuevos++;
+    }
+  }
+  if (nuevos) { cambioFicha(); toast(`Ficha actualizada con los datos del Excel de ${nuevos} referencias`); }
+  FILAS = [...porRef.values()].map(calcularLinea);
+  PEDIDO.ignoradas = ignoradas;
+  $("#resultado").classList.remove("hidden");
+  pintarTabla();
+}
+function calcularLinea(r) {
+  const fi = F.items[r.ref] || {};
+  const st = infoStock(r.ref);
+  const l = { ...r, desc: r.desc || fi.desc || st?.desc || "", st, fi };
+  // kg por caja: el de la ficha; si la ficha no lo tiene, el del stock (peso ÷ cajas del sistema)
+  const stPide = !st?.kgCaja && STOCK_PIDE.zona !== STOCK.zona ? infoStock(r.ref, STOCK_PIDE) : null;
+  l.kgCaja = fi.kgCaja || st?.kgCaja || stPide?.kgCaja || null;
+  l.kgCajaDe = fi.kgCaja ? "ficha" : st?.kgCaja ? "stock" : stPide?.kgCaja ? "stockPide" : null;
+  l.kgVariable = l.kgCajaDe === "stock" ? st.variable : l.kgCajaDe === "stockPide" ? stPide.variable : false;
+  if (!l.desc && stPide) l.desc = stPide.desc;
+  // cajas por base y bases por palet: solo de la ficha técnica (o lo corregido a mano)
+  l.cajasBase = fi.cajasBase || null;
+  l.basesPalet = fi.basesPalet || null;
+
+  l.problemas = [];
+  if (r.kg > 0 && !l.kgCaja) l.problemas.push("Falta kg por caja");
+  if (!l.cajasBase) l.problemas.push("Falta cajas por base en la ficha");
+  const cajasDeKilos = r.kg > 0 ? (l.kgCaja ? arriba(r.kg / l.kgCaja) : null) : 0;
+  if (cajasDeKilos != null) l.cajasNec = cajasDeKilos + arriba(r.cajasPed);
+  if (l.cajasNec != null && l.cajasBase) {
+    l.bases = arriba(l.cajasNec / l.cajasBase);
+    l.cajas = l.bases * l.cajasBase;
+    l.excesoCajas = l.cajas - l.cajasNec;
+    if (l.kgCaja) { l.kgBase = l.kgCaja * l.cajasBase; l.kgEnv = l.cajas * l.kgCaja; }
+    // en kilos solo se puede comparar si todo lo pedido venía en kilos
+    if (l.kgEnv != null && !r.cajasPed) l.excesoKg = l.kgEnv - r.kg;
+    if (l.basesPalet) l.palets = { completos: Math.floor(l.bases / l.basesPalet), sueltas: l.bases % l.basesPalet };
+    if (conStock() && !st) l.problemas.push("No hay stock de esta referencia");
+    else if (st && l.cajas > st.disp) {
+      const basesHay = Math.floor(st.disp / l.cajasBase);
+      l.problemas.push(`Falta stock: hay ${nf(st.disp)} cajas (${basesHay} ${basesHay === 1 ? "base" : "bases"})`);
+    }
+  }
+  l.estado = l.problemas.length ? "bad" : "ok";
+  return l;
+}
+const textoPalets = (p) => {
+  if (!p) return "";
+  const a = p.completos ? `${p.completos} ${p.completos === 1 ? "palet" : "palets"}` : "";
+  const b = p.sueltas ? `${p.sueltas} ${p.sueltas === 1 ? "base" : "bases"}` : "";
+  return [a, b].filter(Boolean).join(" + ");
+};
+const textoPedido = (kg, cj) => [kg > 0 ? `${nf(kg, 2)} kg` : "", cj > 0 ? `${nf(cj, 2)} ${cj === 1 ? "caja" : "cajas"}` : ""].filter(Boolean).join(" + ");
+const textoEstado = (l) => (l.problemas.length ? l.problemas.join(" · ") : "Listo");
+const textoExceso = (l) => l.excesoCajas == null ? "" : `+${nf(l.excesoCajas)} ${l.excesoCajas === 1 ? "caja" : "cajas"}${l.excesoKg != null ? ` · +${nf(l.excesoKg, 2)} kg` : ""}`;
+
+// ---------- tabla ----------
+const conStock = () => STOCK.filas.length > 0;
+function celdaInput(l, campo, dec) {
+  const v = campo === "kgCaja" ? l.fi.kgCaja : l.fi[campo];
+  const falta = campo === "cajasBase" ? !v : campo === "kgCaja" ? l.kg > 0 && !l.kgCaja : false;
+  const deStock = campo === "kgCaja" && (l.kgCajaDe === "stock" || l.kgCajaDe === "stockPide");
+  const quien = l.kgCajaDe === "stockPide" ? `stock de ${(ALMACENES[STOCK_PIDE.zona] || "").replace("Garcimar ", "")}` : "stock";
+  const pista = deStock ? (l.kgVariable ? `Del ${quien}: media (peso variable)` : `Del ${quien}: peso ÷ cajas`) : "";
+  const ph = deStock ? nf(l.kgCaja, 3) : "";
+  return `<td><input type="number" min="0" step="${dec ? "any" : "1"}" inputmode="${dec ? "decimal" : "numeric"}" class="${falta ? "falta" : ""}" data-ref="${esc(l.ref)}" data-campo="${campo}" value="${v ?? ""}" placeholder="${ph}" ${puedeEditar() ? "" : "disabled"} aria-label="${campo}">${pista ? `<div class="pista">${pista}</div>` : ""}</td>`;
+}
+function filaHTML(l) {
+  const st = l.st;
+  return `<td class="mono">${esc(l.codigo)}</td>
+    <td class="desc">${esc(l.desc)}</td>
+    <td class="num" style="white-space:nowrap">${esc(textoPedido(l.kg, l.cajasPed))}</td>
+    ${celdaInput(l, "kgCaja", true)}${celdaInput(l, "cajasBase", false)}${celdaInput(l, "basesPalet", false)}
+    <td class="num">${nf(l.kgBase, 2)}</td>
+    <td class="num">${nf(l.cajasNec)}</td>
+    <td class="num bases">${l.bases ?? "—"}</td>
+    <td class="num">${nf(l.cajas)}</td>
+    <td class="num">${nf(l.kgEnv, 2)}</td>
+    <td class="num" style="white-space:nowrap">${esc(textoExceso(l))}</td>
+    <td style="white-space:nowrap">${esc(textoPalets(l.palets))}</td>
+    ${conStock() ? `<td class="num">${st ? nf(st.disp) : '<span class="badge bad">0</span>'}</td>` : ""}
+    <td><span class="badge ${l.estado}">${esc(textoEstado(l))}</span></td>`;
+}
+function pintarTabla() {
+  const vis = FILTRO === "revisar" ? FILAS.filter((l) => l.estado !== "ok") : FILAS;
+  const ok = FILAS.filter((l) => l.bases != null);
+  const sum = (arr, k) => arr.reduce((n, l) => n + (l[k] || 0), 0);
+  const revisar = FILAS.filter((l) => l.estado !== "ok").length;
+  const conKg = ok.filter((l) => l.kgEnv != null);
+  $("#tiles").innerHTML = [
+    [nf(FILAS.length), "Referencias"],
+    [nf(sum(ok, "bases")), ok.length < FILAS.length ? `Bases a enviar (${ok.length} de ${FILAS.length} referencias calculadas)` : "Bases a enviar"],
+    [nf(sum(ok, "cajas")), `Cajas a enviar (se necesitan ${nf(sum(ok, "cajasNec"))})`],
+    [nf(sum(conKg, "kgEnv")), conKg.length < ok.length ? "Kg que salen (de las que se sabe el peso)" : "Kg que salen"],
+    [`<span style="color:var(${revisar ? "--warn" : "--ok"})">${nf(revisar)}</span>`, "Por revisar"],
+  ].map(([n, l]) => `<div class="tile"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("");
+  document.querySelectorAll("[data-filtro]").forEach((b) => b.classList.toggle("on", b.dataset.filtro === FILTRO));
+  const ig = PEDIDO.ignoradas;
+  const avisos = [
+    ig.sinCantidad ? `${ig.sinCantidad} ${ig.sinCantidad === 1 ? "fila" : "filas"} sin cantidad` : "",
+    ...[...ig.unidades].map(([u, n]) => `${n} ${n === 1 ? "fila" : "filas"} en «${u}», que no es kilos ni cajas`),
+  ].filter(Boolean);
+  $("#avisos-pedido").innerHTML = avisos.length ? `<div class="status bad">No se han contado: ${esc(avisos.join(" · "))}.</div>` : "";
+  const nCol = conStock() ? 15 : 14;
+  $("#tabla").innerHTML = `<thead><tr><th>Ref.</th><th>Descripción</th><th class="num">Pedido</th><th>Kg / caja</th><th>Cajas / base</th><th>Bases / palet</th>
+      <th class="num">Kg / base</th><th class="num">Cajas necesarias</th><th class="num">Bases</th><th class="num">Cajas que salen</th><th class="num">Kg que salen</th><th class="num">De más</th><th>Palets</th>${conStock() ? '<th class="num">Stock (cajas)</th>' : ""}<th>Estado</th></tr></thead>
+    <tbody>${vis.map((l) => `<tr data-ref="${esc(l.ref)}">${filaHTML(l)}</tr>`).join("") || `<tr><td colspan="${nCol}" class="muted">Nada por revisar 👍</td></tr>`}</tbody>
+    <tfoot><tr class="total"><td colspan="2">Total</td><td class="num" style="white-space:nowrap">${esc(textoPedido(sum(FILAS, "kg"), sum(FILAS, "cajasPed")))}</td><td colspan="4"></td>
+      <td class="num">${nf(sum(ok, "cajasNec"))}</td><td class="num bases">${nf(sum(ok, "bases"))}</td><td class="num">${nf(sum(ok, "cajas"))}</td><td class="num">${nf(sum(conKg, "kgEnv"), 2)}</td><td colspan="${nCol - 11}"></td></tr></tfoot>`;
+  pintarSistema();
+}
+// Repinta sin perder el recuadro en el que se está escribiendo
+function conservarFoco(pintar, cont) {
+  setTimeout(() => { // después de que el foco haya pasado al siguiente recuadro
+    const a = document.activeElement;
+    const foco = a?.dataset?.campo && cont.contains(a) ? { ref: a.dataset.ref, campo: a.dataset.campo } : null;
+    pintar();
+    if (foco) {
+      const el = [...cont.querySelectorAll("input[data-campo]")].find((x) => x.dataset.ref === foco.ref && x.dataset.campo === foco.campo);
+      if (el) { el.focus(); try { el.select(); } catch {} }
+    }
+  }, 0);
+}
+function editar(ref, campo, valor) {
+  if (!puedeEditar()) { toast("Solo el responsable puede cambiar la ficha"); return; }
+  let v = num(valor);
+  if (v != null && !(v > 0)) v = null;
+  if (v != null && campo !== "kgCaja") v = Math.round(v);
+  const l = FILAS.find((x) => x.ref === ref);
+  ponerFicha(ref, { [campo]: v }, l?.desc || STOCK.porArt.get(ref)?.desc);
+  cambioFicha();
+  if (PEDIDO) {
+    FILAS = FILAS.map((x) => (x.ref === ref ? calcularLinea(x) : x));
+    conservarFoco(pintarTabla, $("#tabla"));
+  }
+  conservarFoco(pintarBuscador, $("#ficha-lista"));
+}
+for (const cont of ["#tabla", "#ficha-lista"]) {
+  $(cont).addEventListener("change", (e) => {
+    const i = e.target.closest("input[data-campo]");
+    if (i) editar(i.dataset.ref, i.dataset.campo, i.value);
+  });
+}
+document.querySelectorAll("[data-filtro]").forEach((b) => b.addEventListener("click", () => { FILTRO = b.dataset.filtro; pintarTabla(); }));
+
+// ---------- ficha: buscar y corregir una referencia ----------
+function pintarBuscador() {
+  const q = norm($("#ficha-buscar").value);
+  const box = $("#ficha-lista");
+  if (!q) { box.innerHTML = ""; return; }
+  const refs = new Set([...Object.keys(F.items), ...STOCK.porArt.keys()]);
+  const desc = (ref) => F.items[ref]?.desc || STOCK.porArt.get(ref)?.desc || "";
+  const res = [...refs].filter((ref) => norm(ref).includes(q) || norm(desc(ref)).includes(q))
+    .sort((a, b) => (norm(a).startsWith(q) ? 0 : 1) - (norm(b).startsWith(q) ? 0 : 1) || a.localeCompare(b, "es", { numeric: true }));
+  if (!res.length) { box.innerHTML = `<p class="muted">No hay ninguna referencia con «${esc($("#ficha-buscar").value)}» en la ficha ni en el stock.</p>`; return; }
+  const inp = (ref, campo, v, dec, ph = "") => `<input type="number" min="0" step="${dec ? "any" : "1"}" inputmode="${dec ? "decimal" : "numeric"}" data-ref="${esc(ref)}" data-campo="${campo}" value="${v ?? ""}" placeholder="${ph}" ${puedeEditar() ? "" : "disabled"} aria-label="${campo}">`;
+  box.innerHTML = `<div class="scroll"><table class="tbl"><thead><tr><th>Ref.</th><th>Descripción</th><th>Cajas / base</th><th>Bases / palet</th><th>Kg / caja</th><th>Último cambio</th></tr></thead><tbody>${res.slice(0, 40).map((ref) => {
+    const i = F.items[ref] || {};
+    const st = infoStock(ref);
+    return `<tr><td class="mono">${esc(ref)}</td><td class="desc">${esc(desc(ref))}</td>
+      <td>${inp(ref, "cajasBase", i.cajasBase, false)}</td><td>${inp(ref, "basesPalet", i.basesPalet, false)}</td>
+      <td>${inp(ref, "kgCaja", i.kgCaja, true, st?.kgCaja ? nf(st.kgCaja, 3) : "")}${!i.kgCaja && st?.kgCaja ? '<div class="pista">Vacío: se usa el del stock</div>' : ""}</td>
+      <td class="muted" style="white-space:nowrap">${i.t ? `${esc(i.por || "")}<br>${new Date(i.t).toLocaleDateString("es-ES")}` : "Sin datos"}</td></tr>`;
+  }).join("")}</tbody></table></div>${res.length > 40 ? `<p class="muted">Mostrando 40 de ${res.length}. Escribe más para afinar.</p>` : ""}`;
+}
+$("#ficha-buscar").addEventListener("input", pintarBuscador);
+
+// ---------- importar la ficha técnica ----------
+let IMPORT = null;
+$("#in-ficha").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  if (!puedeEditar()) { toast("Solo el responsable puede importar la ficha"); return; }
+  try {
+    const h = await leerHoja(file);
+    IMPORT = { ...h, mapeo: mapeoRecordado(h.cab, CAMPOS_FICHA, "ficha-mapeo") };
+    pintarImport();
+  } catch (err) {
+    toast("No se ha podido leer la ficha: " + err.message);
+  }
+});
+// Lo que se importaría de cada fila; las cajas por base pueden salir de cajas por palet ÷ bases por palet
+function leerImport() {
+  const m = IMPORT.mapeo, out = new Map();
+  let deducidas = 0;
+  for (const fila of IMPORT.filas) {
+    const ref = normArt(fila[m.articulo]);
+    if (!ref) continue;
+    const v = (c) => (c in m ? num(fila[m[c]]) : null);
+    const campos = {};
+    if (v("kgCaja") > 0) campos.kgCaja = v("kgCaja");
+    if (v("basesPalet") > 0) campos.basesPalet = Math.round(v("basesPalet"));
+    if (v("cajasBase") > 0) campos.cajasBase = Math.round(v("cajasBase"));
+    else if (v("cajasPalet") > 0 && campos.basesPalet && Number.isInteger(v("cajasPalet") / campos.basesPalet)) { campos.cajasBase = v("cajasPalet") / campos.basesPalet; deducidas++; }
+    if (!Object.keys(campos).length) continue;
+    out.set(ref, { campos, desc: "descripcion" in m ? String(fila[m.descripcion] || "").trim() : "" });
+  }
+  return { out, deducidas };
+}
+function pintarImport() {
+  const box = $("#ficha-mapeo");
+  box.classList.remove("hidden");
+  const m = IMPORT.mapeo;
+  const valido = "articulo" in m && ["cajasBase", "cajasPalet", "basesPalet", "kgCaja"].some((c) => c in m);
+  const { out, deducidas } = valido ? leerImport() : { out: new Map(), deducidas: 0 };
+  const cambian = [...out].filter(([ref, x]) => F.items[ref]?.cajasBase && x.campos.cajasBase && F.items[ref].cajasBase !== x.campos.cajasBase).length;
+  box.innerHTML = `<div class="status"><b>${esc(IMPORT.archivo)}</b> · ${IMPORT.filas.length} filas. Comprueba que cada dato sale de su columna:</div>
+    ${selectsMapeo(CAMPOS_FICHA, IMPORT.cab, m)}
+    <p class="muted">${valido ? `Se importan <b>${nf(out.size)}</b> referencias${deducidas ? ` (en ${nf(deducidas)} las cajas por base salen de cajas por palet ÷ bases por palet)` : ""}.${cambian ? ` <b>${nf(cambian)}</b> cambian sus cajas por base respecto a la ficha actual.` : ""}` : "Falta la columna de referencia y al menos una de cajas por base, cajas por palet, bases por palet o kg por caja."}</p>
+    <div class="row"><button class="btn primary" id="imp-ok" ${valido && out.size ? "" : "disabled"}>Importar ${nf(out.size)} referencias</button><button class="btn" id="imp-cancel">Cancelar</button></div>`;
+  escucharMapeo(box, IMPORT.cab, m, "ficha-mapeo", pintarImport);
+  $("#imp-cancel").addEventListener("click", () => { box.classList.add("hidden"); IMPORT = null; });
+  $("#imp-ok").addEventListener("click", () => {
+    for (const [ref, x] of out) ponerFicha(ref, x.campos, x.desc, "importada");
+    box.classList.add("hidden");
+    IMPORT = null;
+    cambioFicha();
+    toast(`Ficha técnica: ${nf(out.size)} referencias importadas`);
+    if (PEDIDO) calcular();
+    pintarBuscador();
+  });
+}
+
+// ---------- exportar ----------
+function descargarExcel(hojas, nombre) {
+  const wb = XLSX.utils.book_new();
+  for (const [hoja, filas, cab] of hojas) {
+    const ws = Array.isArray(filas[0]) ? XLSX.utils.aoa_to_sheet(filas) : XLSX.utils.json_to_sheet(filas, cab ? { header: cab } : undefined);
+    XLSX.utils.book_append_sheet(wb, ws, hoja);
+  }
+  XLSX.writeFile(wb, nombre);
+}
+$("#btn-exportar").addEventListener("click", () => {
+  const filas = FILAS.map((l) => ({
+    "Referencia": l.codigo, "Descripción": l.desc, "Kg pedidos": l.kg ? +l.kg.toFixed(3) : "", "Cajas pedidas": l.cajasPed || "",
+    "Kg por caja": l.kgCaja ?? "", "Cajas por base": l.cajasBase ?? "", "Bases por palet": l.basesPalet ?? "",
+    "Cajas necesarias": l.cajasNec ?? "", "Bases a enviar": l.bases ?? "", "Cajas que salen": l.cajas ?? "", "Kg que salen": l.kgEnv != null ? +l.kgEnv.toFixed(3) : "",
+    "Cajas de más": l.excesoCajas ?? "", "Kg de más": l.excesoKg != null ? +l.excesoKg.toFixed(3) : "", "Palets": textoPalets(l.palets),
+    ...(conStock() ? { "Stock disponible (cajas)": l.st ? l.st.disp : 0 } : {}),
+    "Estado": textoEstado(l),
+  }));
+  descargarExcel([["Traspaso por bases", filas]], `traspaso_bases${STOCK.zona ? "_" + STOCK.zona : ""}_${hoy()}.xlsx`);
+});
+$("#btn-imprimir").addEventListener("click", () => window.print());
+$("#btn-plantilla").addEventListener("click", () => {
+  descargarExcel([
+    ["Pedido", [], ["Referencia", "Descripción", "Kilos pedidos", "Cajas pedidas"]],
+    ["Cómo rellenarla", [["Una fila por referencia."], ["Pon los kilos o las cajas que se piden (o las dos cosas: se suman)."], ["La descripción es opcional."], ["Las cajas por base salen de la ficha de bases, no hace falta ponerlas aquí."]]],
+  ], "plantilla_pedido_traspaso.xlsx");
+});
+$("#btn-export-ficha").addEventListener("click", () => {
+  const filas = Object.entries(F.items).filter(([, i]) => i.kgCaja || i.cajasBase || i.basesPalet).sort(([a], [b]) => a.localeCompare(b, "es", { numeric: true }))
+    .map(([ref, i]) => ({ "Referencia": ref, "Descripción": i.desc || STOCK.porArt.get(ref)?.desc || "", "Cajas por base": i.cajasBase ?? "", "Bases por palet": i.basesPalet ?? "", "Kg por caja": i.kgCaja ?? "",
+      "Origen": i.por || "", "Último cambio": i.t ? new Date(i.t).toLocaleDateString("es-ES") : "" }));
+  descargarExcel([["Ficha de bases", filas, ["Referencia", "Descripción", "Cajas por base", "Bases por palet", "Kg por caja", "Origen", "Último cambio"]]], `ficha_bases_${hoy()}.xlsx`);
+});
+// ---------- pasar al sistema ----------
+const nombreAlm = (z) => ALMACENES[z] || (z ? `Almacén ${z}` : "");
+const listas = () => FILAS.filter((l) => l.bases != null);
+const pendientes = () => FILAS.filter((l) => l.bases == null);
+function datosSistema() {
+  return { origen: STOCK.zona, destino: $("#sel-destino").value, npedido: $("#in-npedido").value.trim(), unidad: $("#sel-unidad-sis").value };
+}
+// Lo que va al sistema de cada referencia: cajas que salen, o sus kilos (aproximados si es de peso variable)
+function cantidadSistema(l, unidad) {
+  if (unidad === "CJ") return l.cajas;
+  return l.kgEnv != null ? +l.kgEnv.toFixed(3) : null;
+}
+function pintarSistema() {
+  if (!PEDIDO) return;
+  const { origen, destino, unidad } = datosSistema();
+  const ok = listas(), pend = pendientes();
+  const sinKg = unidad === "KG" ? ok.filter((l) => l.kgEnv == null).length : 0;
+  const variables = unidad === "KG" ? ok.filter((l) => l.kgEnv != null && l.kgVariable).length : 0;
+  const sinStock = ok.filter((l) => l.problemas.length).length;
+  const avisos = [
+    origen === destino ? "El almacén que pide es el mismo que el que envía." : "",
+    pend.length ? `${pend.length} ${pend.length === 1 ? "referencia queda fuera" : "referencias quedan fuera"} por falta de datos (en rojo en la tabla).` : "",
+    sinStock ? `${sinStock} ${sinStock === 1 ? "referencia va" : "referencias van"} aunque no haya stock suficiente: revísalas antes de grabar.` : "",
+    sinKg ? `${sinKg} sin kg por caja: en kilos quedan fuera; en cajas sí van.` : "",
+    variables ? `${variables} de peso variable: sus kilos son aproximados (media del stock). Mejor meterlas en cajas.` : "",
+  ].filter(Boolean);
+  $("#sistema-aviso").innerHTML = avisos.length ? `<div class="status" style="margin-top:10px">${avisos.map(esc).join("<br>")}</div>` : "";
+  $("#btn-sistema").disabled = $("#btn-hoja").disabled = !ok.length;
+}
+const nombreArchivo = (base) => {
+  const { origen, destino, npedido } = datosSistema();
+  const np = npedido.replace(/[^A-Za-z0-9-]+/g, "_").slice(0, 30);
+  return `${base}_${origen}_a_${destino}_${hoy()}${np ? "_" + np : ""}.xlsx`;
+};
+$("#btn-sistema").addEventListener("click", () => {
+  const { origen, destino, npedido, unidad } = datosSistema();
+  const ok = listas().filter((l) => cantidadSistema(l, unidad) != null);
+  if (!ok.length) { toast("No hay ninguna referencia calculada para pasar al sistema"); return; }
+  const sistema = ok.map((l) => ({
+    ...(npedido ? { "Nº pedido": npedido } : {}),
+    "Almacén origen": nombreAlm(origen), "Almacén destino": nombreAlm(destino),
+    "Material": l.codigo, "Descripción material": l.desc, "Cantidad": cantidadSistema(l, unidad), "Unidad": unidad,
+  }));
+  const detalle = ok.map((l) => ({
+    "Material": l.codigo, "Descripción material": l.desc, "Pedido": textoPedido(l.kg, l.cajasPed), "Cajas por base": l.cajasBase,
+    "Bases": l.bases, "Cajas": l.cajas, "Kg": l.kgEnv != null ? +l.kgEnv.toFixed(3) : "", "Palets": textoPalets(l.palets), "Aviso": l.problemas.join(" · "),
+  }));
+  const fuera = [...pendientes(), ...listas().filter((l) => cantidadSistema(l, unidad) == null)].map((l) => ({
+    "Material": l.codigo, "Descripción material": l.desc, "Pedido": textoPedido(l.kg, l.cajasPed), "Motivo": textoEstado(l) === "Listo" ? "Falta kg por caja" : textoEstado(l),
+  }));
+  descargarExcel([["Para el sistema", sistema], ["Detalle", detalle], ...(fuera.length ? [["No incluidas", fuera]] : [])], nombreArchivo("traspaso_sistema"));
+  toast(`Excel para el sistema: ${ok.length} referencias en ${unidad === "CJ" ? "cajas" : "kilos"}`);
+});
+$("#btn-hoja").addEventListener("click", () => {
+  const { origen, destino, npedido } = datosSistema();
+  const ok = listas(), pend = pendientes();
+  const sum = (k) => ok.reduce((n, l) => n + (l[k] || 0), 0);
+  const conKg = ok.every((l) => l.kgEnv != null);
+  const fecha = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
+  $("#documento").innerHTML = `
+    <div class="doc-cab"><img src="logo-garcimar.png" alt="Garcimar"><h1>Hoja de traspaso entre almacenes${npedido ? `<br><span style="font-size:13px;color:#000">Pedido ${esc(npedido)}</span>` : ""}</h1></div>
+    <div class="doc-datos">
+      <div><span>Sale de</span><b>${esc(nombreAlm(origen))}</b></div>
+      <div><span>Va a</span><b>${esc(nombreAlm(destino))}</b></div>
+      <div><span>Fecha</span><b>${esc(fecha)}</b></div>
+      <div><span>Referencias</span><b>${ok.length}</b></div>
+      <div><span>Bases / cajas</span><b>${nf(sum("bases"))} bases · ${nf(sum("cajas"))} cajas</b></div>
+      <div><span>Kilos${conKg ? "" : " (de las que se sabe el peso)"}</span><b>${nf(sum("kgEnv"), 1)} kg</b></div>
+    </div>
+    <table><thead><tr><th>Nº</th><th>Material</th><th>Descripción</th><th class="n">Bases</th><th class="n">Cajas / base</th><th class="n">Cajas</th><th class="n">Kg</th><th>Palets</th><th>Preparado</th></tr></thead>
+    <tbody>${ok.map((l, i) => `<tr><td>${i + 1}</td><td><b>${esc(l.codigo)}</b></td><td>${esc(l.desc)}${l.problemas.length ? `<br><i>⚠ ${esc(l.problemas.join(" · "))}</i>` : ""}</td>
+      <td class="n grande">${l.bases}</td><td class="n">${l.cajasBase}</td><td class="n grande">${nf(l.cajas)}</td><td class="n">${nf(l.kgEnv, 1)}</td><td>${esc(textoPalets(l.palets))}</td><td><span class="caja"></span></td></tr>`).join("")}
+    <tr class="tot"><td colspan="3">Total</td><td class="n">${nf(sum("bases"))}</td><td></td><td class="n">${nf(sum("cajas"))}</td><td class="n">${nf(sum("kgEnv"), 1)}</td><td colspan="2"></td></tr></tbody></table>
+    ${pend.length ? `<h2>No incluidas (faltan datos)</h2><table><thead><tr><th>Material</th><th>Descripción</th><th>Pedido</th><th>Motivo</th></tr></thead><tbody>${pend.map((l) => `<tr><td>${esc(l.codigo)}</td><td>${esc(l.desc)}</td><td>${esc(textoPedido(l.kg, l.cajasPed))}</td><td>${esc(textoEstado(l))}</td></tr>`).join("")}</tbody></table>` : ""}
+    <div class="doc-firmas"><div>Preparado por / fecha</div><div>Grabado en el sistema por</div><div>Recibido en destino por / fecha</div></div>
+    <div class="doc-pie">Bases completas, siempre igual o más de lo pedido. Generado con el Buscador de artículos de Garcimar.</div>`;
+  document.body.classList.add("imprimir-doc");
+  // el logo tiene que estar cargado antes de imprimir
+  const img = $("#documento img");
+  const imprimir = () => { window.print(); };
+  if (img.complete) setTimeout(imprimir, 50); else { img.onload = imprimir; img.onerror = imprimir; }
+});
+window.addEventListener("afterprint", () => document.body.classList.remove("imprimir-doc"));
+$("#sel-destino").addEventListener("change", pintarSistema);
+$("#sel-unidad-sis").addEventListener("change", (e) => { ls.set("traspaso-unidad-sis", e.target.value); pintarSistema(); });
+
+$("#in-pedido").addEventListener("change", (e) => { const f = e.target.files[0]; e.target.value = ""; cargarPedido(f); });
+
+// ---------- inicio ----------
+function bloquear(motivo) {
+  $("main").innerHTML = `<div class="card" style="max-width:560px;margin:40px auto;text-align:center">
+    <h2>🔒 Solo para el responsable</h2>
+    <p class="muted">${esc(motivo)}</p>
+    <a class="btn primary" href="index.html">← Volver a la app</a></div>`;
+}
+// Se pregunta al servidor si el código guardado sigue siendo de responsable (sin conexión, vale lo último que se supo)
+async function comprobarResponsable() {
+  try {
+    const r = await fetch("/api/escanear", { method: "POST", headers: { "content-type": "application/json", "x-app-code": AJ.codigo }, body: JSON.stringify({ accion: "comprobar" }) });
+    if (r.status === 401 || (r.ok && !(await r.json()).responsable)) {
+      const aj = (await idb.get("ajustes")) || {};
+      await idb.set("ajustes", { ...aj, responsable: false });
+      bloquear("Tu código ya no es de responsable. Pon el código de responsable en Ajustes de la app.");
+    }
+  } catch {}
+}
+(async () => {
+  AJ = Object.assign(AJ, (await idb.get("ajustes")) || {});
+  if (AJ.tema) document.documentElement.dataset.theme = AJ.tema;
+  if (!AJ.codigo || !AJ.responsable) {
+    bloquear("El traspaso por bases solo lo puede usar quien tenga el código de responsable. Si lo tienes, escríbelo en Ajustes de la app y vuelve a entrar.");
+    return;
+  }
+  comprobarResponsable();
+  const guardada = (await idb.get("fichaBases")) || {};
+  F = { items: guardada.items || {}, ver: guardada.ver ?? null, pendientes: guardada.pendientes || {} };
+  if (!puedeEditar()) $("#lbl-import").classList.add("hidden");
+  $("#nota-tabla").textContent = puedeEditar()
+    ? "Los recuadros se pueden corregir: lo que escribas se guarda en la ficha de esa referencia. Rojo = falta el dato."
+    : "Los datos de la ficha solo los puede cambiar el responsable. Rojo = falta el dato.";
+  pintarFicha();
+  // Barcelona es la que distribuye: los traspasos salen siempre de Barcelona hacia Madrid (se puede cambiar para un caso suelto)
+  const sel = $("#sel-almacen");
+  sel.innerHTML = Object.entries(ALMACENES).map(([z, n]) => `<option value="${z}">${esc(n)}</option>`).join("");
+  const z = ENVIA;
+  sel.value = z;
+  sel.addEventListener("change", () => cargarStock(sel.value));
+  const dest = $("#sel-destino");
+  dest.innerHTML = sel.innerHTML;
+  dest.value = PIDE;
+  dest.addEventListener("change", () => cargarStockPide(dest.value));
+  cargarStockPide(PIDE);
+  const u = ls.get("traspaso-unidad-sis");
+  if (u === "KG" || u === "CJ") $("#sel-unidad-sis").value = u;
+  sel.addEventListener("change", pintarSistema);
+  sincronizar();
+  cargarStock(z);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") sincronizar(); });
+})();
+</script>
+</body>
+</html>

@@ -52,8 +52,10 @@ header { position: sticky; top: 0; z-index: 5; background: #0f2a3d; color: #fff;
 nav { display: flex; gap: 4px; overflow-x: auto; padding: 0 calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left)); }
 nav button { flex: 1; background: none; border: 0; color: #b9cbd8; padding: 10px 4px 12px; font: inherit; font-size: 15px; border-bottom: 3px solid transparent; white-space: nowrap; }
 nav button.on { color: #fff; border-bottom-color: #3aa3dc; font-weight: 600; }
-/* con la pestaña Movimientos, las cinco tienen que caber en el ancho de un móvil */
-@media (max-width: 480px) { nav { gap: 0; padding-left: 8px; padding-right: 8px; } nav button { font-size: 13px; padding-left: 3px; padding-right: 3px; } }
+/* Traspaso es otra página: un enlace con el mismo aspecto que las pestañas */
+nav a.nav-link { flex: 1; display: flex; align-items: center; justify-content: center; color: #b9cbd8; padding: 10px 4px 12px; font-size: 15px; text-decoration: none; border-bottom: 3px solid transparent; white-space: nowrap; }
+/* con Movimientos y Traspaso, las seis tienen que caber en el ancho de un móvil */
+@media (max-width: 480px) { nav { gap: 0; padding-left: 8px; padding-right: 8px; } nav button, nav a.nav-link { font-size: 13px; padding-left: 3px; padding-right: 3px; } }
 main { padding: 16px; max-width: 760px; margin: 0 auto; padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
 /* anotar movimiento: botones grandes para usar con guantes */
 .anotar { border: 2px solid var(--accent); }
@@ -160,6 +162,7 @@ details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
     <button data-tab="movimientos" id="nav-mov" class="hidden">Movimientos<span class="badge" id="nav-mov-n"></span></button>
     <button data-tab="informe">Informe</button>
     <button data-tab="datos">Datos</button>
+    <a href="traspaso.html" class="nav-link hidden" id="nav-traspaso">Traspaso</a>
     <button data-tab="ajustes">Ajustes</button>
   </nav>
 </header>
@@ -245,6 +248,11 @@ details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
       <h2>Datos de ejemplo</h2>
       <p class="muted">Para probar la app sin tus Excel. Sustituye lo que haya cargado.</p>
       <button class="btn" id="btn-ejemplo">Cargar datos de ejemplo</button>
+    </div>
+    <div class="card hidden" id="card-traspaso">
+      <h2>Traspaso entre almacenes</h2>
+      <p class="muted">Carga el Excel con los kilos que pide otro almacén y te dice cuántas bases enviar de cada referencia, siempre por encima de lo pedido.</p>
+      <a class="btn" href="traspaso.html" style="text-decoration:none">📦 Calcular bases de un traspaso</a>
     </div>
     <div class="card">
       <h2>Exportar</h2>
@@ -361,10 +369,10 @@ const store = (() => {
 // ---------- definición de los Excel ----------
 const TIPOS = {
   stock: {
-    titulo: "Stock almacén", desc: "Artículo, descriptivo, lote, caducidad, cajas, UA, situación, entrada, ubicación",
+    titulo: "Stock almacén", desc: "Artículo, descriptivo, lote, caducidad, cajas, peso, UA, situación, entrada, ubicación",
     campos: [
       ["articulo", "Nº artículo", true], ["descripcion", "Descriptivo", true], ["lote", "Lote"], ["caducidad", "Fecha caducidad"],
-      ["cajas", "Cajas / unidades"], ["ua", "Nº UA"], ["situacion", "Situación"], ["entrada", "Nº entrada"], ["ubicacion", "Ubicación", true],
+      ["cajas", "Cajas / unidades"], ["peso", "Peso (kg)"], ["ua", "Nº UA"], ["situacion", "Situación"], ["entrada", "Nº entrada"], ["ubicacion", "Ubicación", true],
     ],
   },
   maestro: {
@@ -382,6 +390,7 @@ const CLAVES = {
   lote: ["lote", "batch", "lot"],
   caducidad: ["caducidad", "fecha cad", "consumo", "vencimiento", "expiracion", "caduc", "fcad", "bbd", "cad"],
   cajas: ["cajas", "cantidad", "unidades", "bultos", "uds", "cant", "stock"],
+  peso: ["peso", "kilos", "kgs", "kg"], // con las cajas da el kg por caja de cada artículo (traspasos por bases)
   ua: ["ua", "sscc", "contenedor", "matricula", "palet", "pallet", "hu"],
   situacion: ["situacion", "estado", "status", "sit"],
   entrada: ["entrada", "recepcion", "albaran"],
@@ -1167,6 +1176,9 @@ function programarMov() {
 }
 function pintarRol() {
   $("#nav-mov").classList.toggle("hidden", !S.ajustes.responsable);
+  // el traspaso por bases es solo del responsable
+  $("#nav-traspaso").classList.toggle("hidden", !S.ajustes.responsable);
+  $("#card-traspaso").classList.toggle("hidden", !S.ajustes.responsable);
   if (!S.ajustes.responsable && $("#tab-movimientos").classList.contains("on")) document.querySelector('nav button[data-tab="escanear"]').click();
   pintarMovimientos(); pintarCargas(); pintarBase(); pintarAjustes();
 }
