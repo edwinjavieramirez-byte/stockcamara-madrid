@@ -838,7 +838,8 @@ function leerCadena() {
     const f = masNueva(validas) || masNueva(filas);
     const base = t(f, "consumo").toUpperCase(), sob = t(f, "sob").toUpperCase(), dis = t(f, "dis").toUpperCase();
     const fSob = sob ? num(t(f, "fSob")) : null, fDis = dis ? num(t(f, "fDis")) : null;
-    if ((sob && !(fSob > 0)) || (dis && !(fDis > 0))) continue;
+    const desc = t(f, "desc") || filas.map((x) => t(x, "desc")).find(Boolean) || "";
+    if ((sob && !(fSob > 0)) || (dis && !(fDis > 0))) { if (desc) out.set(ref, { campos: {}, desc }); continue; }
     const bulto = dis || sob || base || "CJ"; // lo que se mueve: la caja; si no hay caja, la unidad (bolsa de hielo, tarta…)
     const basePorBulto = (sob ? fSob : 1) * (dis ? fDis : 1);
     const campos = { bulto };
@@ -846,7 +847,7 @@ function leerCadena() {
     if (sob === "UD") campos.udCaja = dis ? fDis : 1;
     else if (base === "UD") campos.udCaja = basePorBulto;
     if (validas.includes(f)) { campos.cajasBase = Math.round(num(t(f, "cajasFila"))); campos.basesPalet = Math.round(num(t(f, "filas"))); conBase++; }
-    out.set(ref, { campos, desc: t(f, "desc") });
+    out.set(ref, { campos, desc });
   }
   return { out, deducidas: 0, conBase, varias };
 }
@@ -939,6 +940,8 @@ const motivoPedido = (l) => (l.bases == null ? textoEstado(l) : "falta kg por ca
 // El Excel para el sistema sale con las mismas hojas, columnas y orden que el pedido (PRIORITARIOS, Picking, PALETS…),
 // con la cantidad ya ajustada a bases completas y el tipo de cada una (CJ, UD o KG). Lo que no se ha podido calcular
 // se deja como venía y se marca en «Aviso».
+// descripción de un código: la de la ficha técnica; si no, la del stock del que envía o del que pide
+const descripcionDe = (ref) => (ref ? F.items[ref]?.desc || STOCK.porArt.get(ref)?.desc || STOCK_PIDE.porArt?.get(ref)?.desc || "" : "");
 function hojasComoPedido(unidad) {
   const usados = new Set(["Detalle", HOJA_PEDIDO, "Datos del traspaso"]);
   return hojasIncluidas().map((hoja) => {
@@ -946,19 +949,26 @@ function hojasComoPedido(unidad) {
     const porRef = new Map(FILAS.filter((l) => l.hoja === hoja.nombre).map((l) => [l.ref, l]));
     const ancho = Math.max(hoja.cab.length, ...hoja.filas.map((f) => f.length));
     const cab = Array.from({ length: ancho }, (_, i) => hoja.cab[i] ?? "");
-    const filas = [[...cab, "Bases", "Cajas por base", "Pedido original", "Aviso"]];
+    // la descripción va al lado del artículo; si el pedido ya trae columna de descripción, se rellena la suya
+    const conDesc = "descripcion" in m, junto = "articulo" in m ? m.articulo + 1 : 0;
+    const conDescripcion = (f, ref, l) => {
+      const d = (l?.desc || descripcionDe(ref)) ?? "";
+      if (conDesc) { if (!String(f[m.descripcion] ?? "").trim()) f[m.descripcion] = d; return f; }
+      return [...f.slice(0, junto), d, ...f.slice(junto)];
+    };
+    const filas = [[...conDescripcion([...cab], "", { desc: "Descripción" }), "Bases", "Cajas por base", "Pedido original", "Aviso"]];
     const vistas = new Set();
     for (const fila of hoja.filas) {
       if (!fila.some((v) => String(v ?? "").trim())) continue;
       const f = Array.from({ length: ancho }, (_, i) => fila[i] ?? "");
       const ref = "articulo" in m ? normArt(fila[m.articulo]) : "";
       const l = ref ? porRef.get(ref) : null;
-      if (!l) { filas.push([...f, "", "", "", ref ? "No se ha calculado: revisa la cantidad o la unidad" : ""]); continue; }
-      if (vistas.has(ref)) { filas.push([...f, "", "", "", "Repetida en esta hoja: su cantidad va sumada en la primera fila"]); continue; }
+      if (!l) { filas.push([...conDescripcion(f, ref), "", "", "", ref ? "No se ha calculado: revisa la cantidad o la unidad" : ""]); continue; }
+      if (vistas.has(ref)) { filas.push([...conDescripcion(f, ref, l), "", "", "", "Repetida en esta hoja: su cantidad va sumada en la primera fila"]); continue; }
       vistas.add(ref);
       const q = l.bases != null ? cantidadSistema(l, unidad) : null;
       // no se puede en bases completas: va la cantidad del pedido, tal cual
-      if (q == null) { filas.push([...f, "", l.cajasBase ?? "", textoPedido(l), `VA LO PEDIDO: ${motivoPedido(l)}`]); continue; }
+      if (q == null) { filas.push([...conDescripcion(f, ref, l), "", l.cajasBase ?? "", textoPedido(l), `VA LO PEDIDO: ${motivoPedido(l)}`]); continue; }
       const tipo = unidad === "CJ" ? l.bulto : "KG";
       if ("cantidad" in m) {
         if ("unidad" in m) { f[m.cantidad] = q; f[m.unidad] = tipo; }
@@ -967,7 +977,7 @@ function hojasComoPedido(unidad) {
         if ("cajas" in m) f[m.cajas] = unidad === "CJ" ? q : "";
         if ("kilos" in m) f[m.kilos] = unidad === "KG" ? q : "";
       }
-      filas.push([...f, l.bases, l.cajasBase, textoPedido(l), l.problemas.join(" · ")]);
+      filas.push([...conDescripcion(f, ref, l), l.bases, l.cajasBase, textoPedido(l), l.problemas.join(" · ")]);
     }
     // nombre de hoja válido para Excel (máx. 31 caracteres, sin repetir)
     let nombre = String(hoja.nombre).replace(/[\\/?*[\]:]/g, " ").slice(0, 31) || "Pedido";
