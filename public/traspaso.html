@@ -90,6 +90,7 @@ ol.pasos li { margin-bottom: 4px; }
 .doc .n { text-align: right; font-variant-numeric: tabular-nums; }
 .doc .grande { font-size: 15px; font-weight: 700; }
 .doc tr.tot td { font-weight: 700; border-top: 2px solid #000; border-bottom: 0; }
+.doc td.grupo { background: #e8f1f7; font-weight: 700; color: #2f7aa6; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .doc .caja { display: inline-block; width: 14px; height: 14px; border: 1.5px solid #000; }
 .doc h2 { font-size: 13px; margin: 14px 0 6px; color: #2f7aa6; }
 .doc-firmas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 28px; }
@@ -163,7 +164,7 @@ ol.pasos li { margin-bottom: 4px; }
 
   <div class="card no-print">
     <h2>Ficha de bases</h2>
-    <p class="muted">Lo que se sabe de cada código. El <b>kg por caja</b> sale solo del stock (peso ÷ cajas). Las <b>cajas por base</b> salen de la ficha técnica: impórtala aquí. Si cambia el formato de un artículo, búscalo abajo y cambia sus cajas por base; queda guardado para la próxima vez. Las bases por palet son opcionales: sirven para decir cuántos palets completos salen.</p>
+    <p class="muted">Lo que se sabe de cada código. El <b>kg por caja</b> sale solo del stock (peso ÷ cajas). Las <b>cajas por base</b> salen de la ficha técnica: impórtala aquí. Vale tal cual el Excel de la <b>cadena logística</b> del sistema (cadloga): «Cajas por Fila» son las cajas por base, «Filas por Palet» las bases por palet, y de las conversiones salen los kg y las unidades por caja. Si cambia el formato de un artículo, búscalo abajo y cambia sus cajas por base; queda guardado para la próxima vez. Las bases por palet son opcionales: sirven para decir cuántos palets completos salen.</p>
     <div id="ficha-estado"></div>
     <div class="row" style="margin-top:10px">
       <label class="btn small" id="lbl-import">📂 Importar ficha técnica (Excel)<input type="file" id="in-ficha" class="hidden" accept=".xlsx,.xls,.xlsm,.csv"></label>
@@ -408,7 +409,7 @@ const CAMPOS_FICHA = [
 function campoDe(cab) {
   const h = norm(cab);
   if (!h) return null;
-  const caja = /\b(caja|cajas|bulto|bultos|cj|cjs)\b/.test(h), base = /\b(base|bases|capa|capas|manto|mantos|piso|pisos)\b/.test(h);
+  const caja = /\b(caja|cajas|bulto|bultos|cj|cjs)\b/.test(h), base = /\b(base|bases|capa|capas|manto|mantos|piso|pisos|fila|filas)\b/.test(h);
   const palet = /palet|pallet/.test(h), peso = /\b(kg|kgs|kilo|kilos|peso)\b/.test(h);
   if (peso && caja) return "kgCaja";
   if (caja && base) return "cajasBase";
@@ -416,7 +417,7 @@ function campoDe(cab) {
   if (caja && palet) return "cajasPalet";
   if (peso && !base && !palet) return "kilos";
   if (caja) return "cajas";
-  if (/^(unidad|um|umb|uom|u m|ud|unidad de medida|unidad medida|ud medida|medida)$/.test(h)) return "unidad";
+  if (/^(unidad|um|umb|uom|u m|ud|unidad de medida|unidad medida|ud medida|medida|tipo|tipo cantidad|tipo unidad|tipo de unidad|unidad tipo)$/.test(h)) return "unidad";
   if (/\b(cantidad|cant|solicitad[oa]s?|pedid[oa]s?)\b/.test(h)) return "cantidad";
   if (/descrip|nombre|denomin|designa/.test(h)) return "descripcion";
   if (/articulo|referencia|\bref\b|codigo|\bcod\b|material|sku/.test(h)) return "articulo";
@@ -428,11 +429,13 @@ function adivinar(cab, campos) {
   cab.forEach((h, i) => { const c = campoDe(h); if (c && validos.has(c) && !(c in mapeo)) mapeo[c] = i; });
   return mapeo;
 }
-// "KG", "Kilos" → kg; "CJ", "Cajas", "Bultos" → cajas; otra unidad (UN, BOL…) no se sabe convertir
+// "KG" → kg; "CJ", "Cajas" → cajas; "UD", "Unidades" → ud; "PAL", "Palet" → pal; otra unidad no se sabe convertir
 function unidadDe(v) {
   const h = norm(v).replace(/\s/g, "");
-  if (/^(kg|kgs|k|kilo|kilos|kilogramo|kilogramos|kgm)$/.test(h)) return "kg";
+  if (/^(kg|kgs|k|kn|kilo|kilos|kilogramo|kilogramos|kgm)$/.test(h)) return "kg";
   if (/^(cj|cjs|caja|cajas|ca|cs|bulto|bultos|bul|bto|ct|ctn|car|carton|box)$/.test(h)) return "cajas";
+  if (/^(ud|uds|un|und|uns|unid|unidad|unidades|u)$/.test(h)) return "ud";
+  if (/^(pal|pals|palet|palets|pallet|pallets|paleta|paletas|pl)$/.test(h)) return "pal";
   return null;
 }
 // «20 CJ», «150 kg», «CJ 20», «1.234,5 KG» o un número solo → { q: cantidad, texto: unidad escrita ("" si no hay) }
@@ -459,6 +462,24 @@ async function leerHoja(file) {
   const cab = (mejor.filas[mejor.hr] || []).map((h, i) => String(h).trim() || `Columna ${i + 1}`);
   return { cab, filas: mejor.filas.slice(mejor.hr + 1), archivo: file.name };
 }
+// Todas las hojas del libro, cada una con su fila de cabecera
+async function leerLibro(file) {
+  const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true });
+  const hojas = [];
+  for (const nombre of wb.SheetNames) {
+    const filas = XLSX.utils.sheet_to_json(wb.Sheets[nombre], { header: 1, raw: true, defval: "" });
+    if (!filas.length) continue;
+    let mejor = { p: -1, hr: 0 };
+    for (let r = 0; r < Math.min(filas.length, 15); r++) {
+      const p = (filas[r] || []).filter((v) => typeof v === "string" && campoDe(v)).length;
+      if (p > mejor.p) mejor = { p, hr: r };
+    }
+    const cab = (filas[mejor.hr] || []).map((h, i) => String(h).trim() || `Columna ${i + 1}`);
+    hojas.push({ nombre, cab, filas: filas.slice(mejor.hr + 1) });
+  }
+  if (!hojas.length) throw new Error("El archivo está vacío.");
+  return hojas;
+}
 // Desplegables para confirmar qué columna es cada dato; lo corregido a mano se recuerda por el nombre de la columna
 function selectsMapeo(campos, cab, mapeo) {
   const opciones = (c) => `<option value="">—</option>` + cab.map((h, i) => `<option value="${i}" ${mapeo[c] === i ? "selected" : ""}>${esc(h)}</option>`).join("");
@@ -482,11 +503,37 @@ function mapeoRecordado(cab, campos, claveLs) {
 }
 
 // ---------- pedido ----------
+// Un pedido puede traer varias hojas (p. ej. PRIORITARIOS, Picking, PALETS): se leen todas las que tengan artículo y cantidad
+function mapeoDeHoja(h) {
+  // las columnas se buscan por su nombre en la primera hoja; si una hoja tiene otros nombres, se adivinan
+  const m = {};
+  for (const [c, i] of Object.entries(PEDIDO.mapeo)) { const j = h.cab.indexOf(PEDIDO.hojas[0].cab[i]); if (j >= 0) m[c] = j; }
+  const propio = adivinar(h.cab, CAMPOS_PEDIDO);
+  for (const [c, i] of Object.entries(propio)) if (!(c in m)) m[c] = i;
+  if (!("unidad" in m)) { const u = columnaUnidad(h, m); if (u != null) m.unidad = u; }
+  return m;
+}
+// una columna que casi solo trae CJ / KG / UD / PAL es la unidad, se llame como se llame
+function columnaUnidad(h, mapeo) {
+  const usadas = new Set(Object.values(mapeo));
+  for (let i = 0; i < h.cab.length; i++) {
+    if (usadas.has(i)) continue;
+    const vals = h.filas.slice(0, 300).map((f) => String(f[i] ?? "").trim()).filter(Boolean);
+    if (vals.length >= 1 && vals.filter((v) => unidadDe(v)).length >= vals.length * 0.8) return i;
+  }
+  return null;
+}
 async function cargarPedido(file) {
   if (!file) return;
   try {
-    const h = await leerHoja(file);
-    PEDIDO = { ...h, mapeo: mapeoRecordado(h.cab, CAMPOS_PEDIDO, "traspaso-mapeo"), unidadDef: ls.get("traspaso-unidad") || "kg" };
+    const libro = await leerLibro(file);
+    // solo las hojas con artículo y alguna cantidad
+    const hojas = libro.filter((h) => { const m = adivinar(h.cab, CAMPOS_PEDIDO); return "articulo" in m && ["kilos", "cajas", "cantidad"].some((c) => c in m); });
+    if (!hojas.length) hojas.push(libro.sort((a, b) => b.filas.length - a.filas.length)[0]);
+    const h0 = hojas[0];
+    const mapeo = mapeoRecordado(h0.cab, CAMPOS_PEDIDO, "traspaso-mapeo");
+    if (!("unidad" in mapeo)) { const u = columnaUnidad(h0, mapeo); if (u != null) mapeo.unidad = u; }
+    PEDIDO = { archivo: file.name, hojas: hojas.map((h) => ({ ...h, incluida: true })), cab: h0.cab, mapeo, unidadDef: ls.get("traspaso-unidad") || "kg" };
     pintarMapeo();
     calcular(true);
   } catch (e) {
@@ -494,16 +541,25 @@ async function cargarPedido(file) {
     toast("No se ha podido leer el Excel: " + e.message);
   }
 }
+const hojasIncluidas = () => PEDIDO.hojas.filter((h) => h.incluida);
 function pintarMapeo() {
   const box = $("#mapeo");
   box.classList.remove("hidden");
   const m = PEDIDO.mapeo;
   // solo se pregunta la unidad si hay cantidades sin ella (ni en la celda ni en otra columna)
-  const sinUnidad = "cantidad" in m && !("unidad" in m) && PEDIDO.filas.some((f) => { const c = leerCantidad(f[m.cantidad]); return c.q > 0 && !c.texto; });
-  box.innerHTML = `<div class="status"><b>${esc(PEDIDO.archivo)}</b> · ${PEDIDO.filas.length} filas. Comprueba que cada dato sale de su columna. Basta con una de estas: kilos, cajas o cantidad.</div>
+  const sinUnidad = hojasIncluidas().some((h) => {
+    const mh = mapeoDeHoja(h);
+    return "cantidad" in mh && !("unidad" in mh) && h.filas.some((f) => { const c = leerCantidad(f[mh.cantidad]); return c.q > 0 && !c.texto; });
+  });
+  const nFilas = (h) => h.filas.filter((f) => f.some((v) => String(v).trim())).length;
+  box.innerHTML = `<div class="status"><b>${esc(PEDIDO.archivo)}</b>${PEDIDO.hojas.length > 1
+      ? ` · ${PEDIDO.hojas.length} hojas: ${PEDIDO.hojas.map((h, i) => `<label style="white-space:nowrap;margin-right:10px"><input type="checkbox" data-hoja="${i}" ${h.incluida ? "checked" : ""}> ${esc(h.nombre)} (${nFilas(h)})</label>`).join(" ")}`
+      : ` · ${nFilas(PEDIDO.hojas[0])} filas`}
+    <div class="muted" style="margin-top:4px">Comprueba que cada dato sale de su columna. La unidad puede ser CJ (cajas), KG, UD (unidades) o PAL (palets).</div></div>
     ${selectsMapeo(CAMPOS_PEDIDO, PEDIDO.cab, m)}
     ${sinUnidad ? `<div style="margin-top:10px"><label class="f">Hay cantidades sin unidad: esas están en</label><select id="sel-unidad"><option value="kg" ${PEDIDO.unidadDef === "kg" ? "selected" : ""}>Kilos</option><option value="cajas" ${PEDIDO.unidadDef === "cajas" ? "selected" : ""}>Cajas</option></select></div>` : ""}`;
   escucharMapeo(box, PEDIDO.cab, m, "traspaso-mapeo", () => { pintarMapeo(); calcular(true); });
+  box.querySelectorAll("[data-hoja]").forEach((c) => c.addEventListener("change", () => { PEDIDO.hojas[+c.dataset.hoja].incluida = c.checked; pintarMapeo(); calcular(); }));
   $("#sel-unidad")?.addEventListener("change", (e) => { PEDIDO.unidadDef = e.target.value; ls.set("traspaso-unidad", e.target.value); calcular(); });
 }
 
@@ -511,46 +567,47 @@ function pintarMapeo() {
 // desdeExcel: pasa a la ficha los datos de kg/caja, cajas/base y bases/palet que traiga el pedido
 function calcular(desdeExcel = false) {
   if (!PEDIDO) return;
-  const m = PEDIDO.mapeo;
-  if (!("articulo" in m) || !["kilos", "cajas", "cantidad"].some((c) => c in m)) {
+  const m0 = PEDIDO.mapeo;
+  if (!("articulo" in m0) || !["kilos", "cajas", "cantidad"].some((c) => c in m0)) {
     $("#resultado").classList.add("hidden");
     toast("Indica qué columna es la referencia y cuál lo pedido (kilos, cajas o cantidad)");
     return;
   }
   const porRef = new Map();
   const ignoradas = { sinCantidad: 0, unidades: new Map() };
-  let nuevos = 0;
-  for (const fila of PEDIDO.filas) {
-    const ref = normArt(fila[m.articulo]);
-    if (!ref) continue;
-    let kg = "kilos" in m ? num(fila[m.kilos]) || 0 : 0;
-    let cj = "cajas" in m ? num(fila[m.cajas]) || 0 : 0;
-    if ("cantidad" in m) {
-      const c = leerCantidad(fila[m.cantidad]);
-      if (c.q > 0) {
-        // manda la unidad escrita en la propia celda («20 CJ»); si no, la de la columna de unidad; si no, la elegida
-        const texto = c.texto || ("unidad" in m ? String(fila[m.unidad] ?? "").trim() : "");
-        const u = c.texto ? unidadDe(c.texto) : "unidad" in m ? unidadDe(texto) : PEDIDO.unidadDef;
-        if (u === "kg") kg += c.q;
-        else if (u === "cajas") cj += c.q;
-        else { const k = texto || "(vacía)"; ignoradas.unidades.set(k, (ignoradas.unidades.get(k) || 0) + 1); continue; }
+  let nuevos = 0, orden = 0;
+  for (const hoja of hojasIncluidas()) {
+    const m = mapeoDeHoja(hoja);
+    if (!("articulo" in m)) continue;
+    for (const fila of hoja.filas) {
+      const ref = normArt(fila[m.articulo]);
+      if (!ref) continue;
+      const q = { kg: "kilos" in m ? num(fila[m.kilos]) || 0 : 0, cajas: "cajas" in m ? num(fila[m.cajas]) || 0 : 0, ud: 0, pal: 0 };
+      if ("cantidad" in m) {
+        const c = leerCantidad(fila[m.cantidad]);
+        if (c.q > 0) {
+          // manda la unidad escrita en la propia celda («20 CJ»); si no, la de la columna de unidad; si no, la elegida
+          const texto = c.texto || ("unidad" in m ? String(fila[m.unidad] ?? "").trim() : "");
+          const u = c.texto ? unidadDe(c.texto) : "unidad" in m ? unidadDe(texto) : PEDIDO.unidadDef;
+          if (u) q[u] += c.q;
+          else { const k = texto || "(vacía)"; ignoradas.unidades.set(k, (ignoradas.unidades.get(k) || 0) + 1); continue; }
+        }
       }
-    }
-    if (!(kg > 0) && !(cj > 0)) { ignoradas.sinCantidad++; continue; }
-    if (!porRef.has(ref)) porRef.set(ref, { ref, codigo: String(fila[m.articulo]).trim(), kg: 0, cajasPed: 0, desc: "", lineas: 0 });
-    const r = porRef.get(ref);
-    r.kg += kg > 0 ? kg : 0;
-    r.cajasPed += cj > 0 ? cj : 0;
-    r.lineas++;
-    if ("descripcion" in m && !r.desc) r.desc = String(fila[m.descripcion] || "").trim();
-    if (desdeExcel && puedeEditar()) {
-      const campos = {};
-      for (const c of ["kgCaja", "cajasBase", "basesPalet"]) {
-        if (!(c in m)) continue;
-        const v = num(fila[m[c]]);
-        if (v > 0 && v !== F.items[ref]?.[c]) campos[c] = c === "kgCaja" ? v : Math.round(v);
+      if (!(q.kg > 0) && !(q.cajas > 0) && !(q.ud > 0) && !(q.pal > 0)) { ignoradas.sinCantidad++; continue; }
+      if (!porRef.has(ref)) porRef.set(ref, { ref, codigo: String(fila[m.articulo]).trim(), kg: 0, cajasPed: 0, udPed: 0, palPed: 0, desc: "", lineas: 0, hoja: hoja.nombre, orden: orden++ });
+      const r = porRef.get(ref);
+      r.kg += Math.max(0, q.kg); r.cajasPed += Math.max(0, q.cajas); r.udPed += Math.max(0, q.ud); r.palPed += Math.max(0, q.pal);
+      r.lineas++;
+      if ("descripcion" in m && !r.desc) r.desc = String(fila[m.descripcion] || "").trim();
+      if (desdeExcel && puedeEditar()) {
+        const campos = {};
+        for (const c of ["kgCaja", "cajasBase", "basesPalet"]) {
+          if (!(c in m)) continue;
+          const v = num(fila[m[c]]);
+          if (v > 0 && v !== F.items[ref]?.[c]) campos[c] = c === "kgCaja" ? v : Math.round(v);
+        }
+        if (Object.keys(campos).length && ponerFicha(ref, campos, r.desc, "importada")) nuevos++;
       }
-      if (Object.keys(campos).length && ponerFicha(ref, campos, r.desc, "importada")) nuevos++;
     }
   }
   if (nuevos) { cambioFicha(); toast(`Ficha actualizada con los datos del Excel de ${nuevos} referencias`); }
@@ -572,19 +629,29 @@ function calcularLinea(r) {
   // cajas por base y bases por palet: solo de la ficha técnica (o lo corregido a mano)
   l.cajasBase = fi.cajasBase || null;
   l.basesPalet = fi.basesPalet || null;
+  l.udCaja = fi.udCaja || null;
+  l.bulto = fi.bulto || "CJ"; // lo que se mueve: la caja, o la unidad si el artículo no va en cajas (hielo, tartas…)
 
   l.problemas = [];
   if (r.kg > 0 && !l.kgCaja) l.problemas.push("Falta kg por caja");
+  if (r.udPed > 0 && !l.udCaja) l.problemas.push("Falta unidades por caja");
+  if (r.palPed > 0 && !l.basesPalet) l.problemas.push("Falta bases por palet");
   if (!l.cajasBase) l.problemas.push("Falta cajas por base en la ficha");
-  const cajasDeKilos = r.kg > 0 ? (l.kgCaja ? arriba(r.kg / l.kgCaja) : null) : 0;
-  if (cajasDeKilos != null) l.cajasNec = cajasDeKilos + arriba(r.cajasPed);
+  // todo se pasa a cajas: kilos ÷ kg por caja, unidades ÷ unidades por caja, palets × bases por palet × cajas por base
+  const partes = [
+    r.kg > 0 ? (l.kgCaja ? arriba(r.kg / l.kgCaja) : null) : 0,
+    r.udPed > 0 ? (l.udCaja ? arriba(r.udPed / l.udCaja) : null) : 0,
+    arriba(r.cajasPed),
+    r.palPed > 0 ? (l.basesPalet && l.cajasBase ? r.palPed * l.basesPalet * l.cajasBase : null) : 0,
+  ];
+  if (partes.every((p) => p != null)) l.cajasNec = partes.reduce((a, b) => a + b, 0);
   if (l.cajasNec != null && l.cajasBase) {
     l.bases = arriba(l.cajasNec / l.cajasBase);
     l.cajas = l.bases * l.cajasBase;
     l.excesoCajas = l.cajas - l.cajasNec;
     if (l.kgCaja) { l.kgBase = l.kgCaja * l.cajasBase; l.kgEnv = l.cajas * l.kgCaja; }
     // en kilos solo se puede comparar si todo lo pedido venía en kilos
-    if (l.kgEnv != null && !r.cajasPed) l.excesoKg = l.kgEnv - r.kg;
+    if (l.kgEnv != null && !r.cajasPed && !r.udPed && !r.palPed) l.excesoKg = l.kgEnv - r.kg;
     if (l.basesPalet) l.palets = { completos: Math.floor(l.bases / l.basesPalet), sueltas: l.bases % l.basesPalet };
     if (conStock() && !st) l.problemas.push("No hay stock de esta referencia");
     else if (st && l.cajas > st.disp) {
@@ -601,7 +668,13 @@ const textoPalets = (p) => {
   const b = p.sueltas ? `${p.sueltas} ${p.sueltas === 1 ? "base" : "bases"}` : "";
   return [a, b].filter(Boolean).join(" + ");
 };
-const textoPedido = (kg, cj) => [kg > 0 ? `${nf(kg, 2)} kg` : "", cj > 0 ? `${nf(cj, 2)} ${cj === 1 ? "caja" : "cajas"}` : ""].filter(Boolean).join(" + ");
+const plural = (n, uno, varios) => `${nf(n, 2)} ${n === 1 ? uno : varios}`;
+const textoPedido = (l) => [
+  l.kg > 0 ? `${nf(l.kg, 2)} kg` : "", l.cajasPed > 0 ? plural(l.cajasPed, "caja", "cajas") : "",
+  l.udPed > 0 ? plural(l.udPed, "unidad", "unidades") : "", l.palPed > 0 ? plural(l.palPed, "palet", "palets") : "",
+].filter(Boolean).join(" + ");
+// cajas, o unidades si el artículo no va en cajas
+const textoBultos = (n, bulto) => (n == null ? "" : bulto === "CJ" ? nf(n) : `${nf(n)} ${bulto}`);
 const textoEstado = (l) => (l.problemas.length ? l.problemas.join(" · ") : "Listo");
 const textoExceso = (l) => l.excesoCajas == null ? "" : `+${nf(l.excesoCajas)} ${l.excesoCajas === 1 ? "caja" : "cajas"}${l.excesoKg != null ? ` · +${nf(l.excesoKg, 2)} kg` : ""}`;
 
@@ -618,14 +691,14 @@ function celdaInput(l, campo, dec) {
 }
 function filaHTML(l) {
   const st = l.st;
-  return `<td class="mono">${esc(l.codigo)}</td>
+  return `<td class="mono">${esc(l.codigo)}${PEDIDO.hojas.length > 1 ? `<div class="pista">${esc(l.hoja)}</div>` : ""}</td>
     <td class="desc">${esc(l.desc)}</td>
-    <td class="num" style="white-space:nowrap">${esc(textoPedido(l.kg, l.cajasPed))}</td>
+    <td class="num" style="white-space:nowrap">${esc(textoPedido(l))}</td>
     ${celdaInput(l, "kgCaja", true)}${celdaInput(l, "cajasBase", false)}${celdaInput(l, "basesPalet", false)}
     <td class="num">${nf(l.kgBase, 2)}</td>
     <td class="num">${nf(l.cajasNec)}</td>
     <td class="num bases">${l.bases ?? "—"}</td>
-    <td class="num">${nf(l.cajas)}</td>
+    <td class="num" style="white-space:nowrap">${esc(textoBultos(l.cajas, l.bulto))}</td>
     <td class="num">${nf(l.kgEnv, 2)}</td>
     <td class="num" style="white-space:nowrap">${esc(textoExceso(l))}</td>
     <td style="white-space:nowrap">${esc(textoPalets(l.palets))}</td>
@@ -656,7 +729,7 @@ function pintarTabla() {
   $("#tabla").innerHTML = `<thead><tr><th>Ref.</th><th>Descripción</th><th class="num">Pedido</th><th>Kg / caja</th><th>Cajas / base</th><th>Bases / palet</th>
       <th class="num">Kg / base</th><th class="num">Cajas necesarias</th><th class="num">Bases</th><th class="num">Cajas que salen</th><th class="num">Kg que salen</th><th class="num">De más</th><th>Palets</th>${conStock() ? '<th class="num">Stock (cajas)</th>' : ""}<th>Estado</th></tr></thead>
     <tbody>${vis.map((l) => `<tr data-ref="${esc(l.ref)}">${filaHTML(l)}</tr>`).join("") || `<tr><td colspan="${nCol}" class="muted">Nada por revisar 👍</td></tr>`}</tbody>
-    <tfoot><tr class="total"><td colspan="2">Total</td><td class="num" style="white-space:nowrap">${esc(textoPedido(sum(FILAS, "kg"), sum(FILAS, "cajasPed")))}</td><td colspan="4"></td>
+    <tfoot><tr class="total"><td colspan="2">Total</td><td class="num" style="white-space:nowrap">${esc(textoPedido({ kg: sum(FILAS, "kg"), cajasPed: sum(FILAS, "cajasPed"), udPed: sum(FILAS, "udPed"), palPed: sum(FILAS, "palPed") }))}</td><td colspan="4"></td>
       <td class="num">${nf(sum(ok, "cajasNec"))}</td><td class="num bases">${nf(sum(ok, "bases"))}</td><td class="num">${nf(sum(ok, "cajas"))}</td><td class="num">${nf(sum(conKg, "kgEnv"), 2)}</td><td colspan="${nCol - 11}"></td></tr></tfoot>`;
   pintarSistema();
 }
@@ -725,14 +798,59 @@ $("#in-ficha").addEventListener("change", async (e) => {
   if (!puedeEditar()) { toast("Solo el responsable puede importar la ficha"); return; }
   try {
     const h = await leerHoja(file);
-    IMPORT = { ...h, mapeo: mapeoRecordado(h.cab, CAMPOS_FICHA, "ficha-mapeo") };
+    IMPORT = { ...h, mapeo: mapeoRecordado(h.cab, CAMPOS_FICHA, "ficha-mapeo"), cadena: columnasCadena(h.cab) };
     pintarImport();
   } catch (err) {
     toast("No se ha podido leer la ficha: " + err.message);
   }
 });
+// La cadena logística del sistema (cadloga): «Cajas por Fila» = cajas por base, «Filas por Palet» = bases por palet,
+// y las conversiones Consumo → Sobreembalaje (UD) → Distribución (CJ) dan los kg y las unidades de cada caja
+const COL_CADENA = {
+  art: "Artículo", desc: "Artículo (Descripción)", consumo: "Consumo", sob: "Sobreembalaje", fSob: "CONVERS_U_SOB",
+  dis: "Distribución", fDis: "CONVERS_U_DIS", filas: "Filas por Palet", cajasFila: "Cajas por Fila", fecha: "Fecha Ultima Modificación",
+};
+function columnasCadena(cab) {
+  const n = cab.map((h) => norm(h));
+  const c = {};
+  for (const [k, nombre] of Object.entries(COL_CADENA)) { const i = n.indexOf(norm(nombre)); if (i >= 0) c[k] = i; }
+  return ["art", "filas", "cajasFila", "dis", "fDis"].every((k) => k in c) ? c : null;
+}
+function leerCadena() {
+  const c = IMPORT.cadena, porArt = new Map();
+  const t = (f, k) => (k in c ? String(f[c[k]] ?? "").trim() : "");
+  for (const f of IMPORT.filas) {
+    const ref = normArt(t(f, "art"));
+    if (!ref) continue;
+    if (!porArt.has(ref)) porArt.set(ref, []);
+    porArt.get(ref).push(f);
+  }
+  const out = new Map();
+  let conBase = 0, varias = 0;
+  for (const [ref, filas] of porArt) {
+    // un artículo puede tener varias cadenas (PPF, PPV…): vale la que tiene filas y cajas por fila; si hay varias, la última modificada
+    const validas = filas.filter((f) => num(t(f, "cajasFila")) > 0 && num(t(f, "filas")) > 0);
+    if (validas.length > 1) varias++;
+    const fecha = (x) => { const v = "fecha" in c ? x[c.fecha] : null; return v instanceof Date ? v.getTime() / 864e5 + 25569 : num(v) || 0; };
+    const masNueva = (lista) => [...lista].sort((a, b) => fecha(b) - fecha(a))[0];
+    const f = masNueva(validas) || masNueva(filas);
+    const base = t(f, "consumo").toUpperCase(), sob = t(f, "sob").toUpperCase(), dis = t(f, "dis").toUpperCase();
+    const fSob = sob ? num(t(f, "fSob")) : null, fDis = dis ? num(t(f, "fDis")) : null;
+    if ((sob && !(fSob > 0)) || (dis && !(fDis > 0))) continue;
+    const bulto = dis || sob || base || "CJ"; // lo que se mueve: la caja; si no hay caja, la unidad (bolsa de hielo, tarta…)
+    const basePorBulto = (sob ? fSob : 1) * (dis ? fDis : 1);
+    const campos = { bulto };
+    if (base === "KG" || base === "KN" || !base) campos.kgCaja = +basePorBulto.toFixed(3);
+    if (sob === "UD") campos.udCaja = dis ? fDis : 1;
+    else if (base === "UD") campos.udCaja = basePorBulto;
+    if (validas.includes(f)) { campos.cajasBase = Math.round(num(t(f, "cajasFila"))); campos.basesPalet = Math.round(num(t(f, "filas"))); conBase++; }
+    out.set(ref, { campos, desc: t(f, "desc") });
+  }
+  return { out, deducidas: 0, conBase, varias };
+}
 // Lo que se importaría de cada fila; las cajas por base pueden salir de cajas por palet ÷ bases por palet
 function leerImport() {
+  if (IMPORT.cadena) return leerCadena();
   const m = IMPORT.mapeo, out = new Map();
   let deducidas = 0;
   for (const fila of IMPORT.filas) {
@@ -753,10 +871,14 @@ function pintarImport() {
   const box = $("#ficha-mapeo");
   box.classList.remove("hidden");
   const m = IMPORT.mapeo;
-  const valido = "articulo" in m && ["cajasBase", "cajasPalet", "basesPalet", "kgCaja"].some((c) => c in m);
-  const { out, deducidas } = valido ? leerImport() : { out: new Map(), deducidas: 0 };
+  const valido = !!IMPORT.cadena || ("articulo" in m && ["cajasBase", "cajasPalet", "basesPalet", "kgCaja"].some((c) => c in m));
+  const { out, deducidas, conBase, varias } = valido ? leerImport() : { out: new Map(), deducidas: 0 };
   const cambian = [...out].filter(([ref, x]) => F.items[ref]?.cajasBase && x.campos.cajasBase && F.items[ref].cajasBase !== x.campos.cajasBase).length;
-  box.innerHTML = `<div class="status"><b>${esc(IMPORT.archivo)}</b> · ${IMPORT.filas.length} filas. Comprueba que cada dato sale de su columna:</div>
+  box.innerHTML = IMPORT.cadena
+    ? `<div class="status"><b>${esc(IMPORT.archivo)}</b> · cadena logística del sistema (${nf(IMPORT.filas.length)} filas).</div>
+      <p class="muted">Se importan <b>${nf(out.size)}</b> artículos: <b>${nf(conBase)}</b> con sus cajas por base («Cajas por Fila») y bases por palet («Filas por Palet»); el resto, solo con el kg por caja. También se guardan las unidades por caja. ${varias ? `${nf(varias)} artículos tienen varias cadenas: se usa la modificada más recientemente.` : ""}${cambian ? ` <b>${nf(cambian)}</b> cambian sus cajas por base respecto a la ficha actual.` : ""}</p>
+      <div class="row"><button class="btn primary" id="imp-ok" ${out.size ? "" : "disabled"}>Importar ${nf(out.size)} artículos</button><button class="btn" id="imp-cancel">Cancelar</button></div>`
+    : `<div class="status"><b>${esc(IMPORT.archivo)}</b> · ${IMPORT.filas.length} filas. Comprueba que cada dato sale de su columna:</div>
     ${selectsMapeo(CAMPOS_FICHA, IMPORT.cab, m)}
     <p class="muted">${valido ? `Se importan <b>${nf(out.size)}</b> referencias${deducidas ? ` (en ${nf(deducidas)} las cajas por base salen de cajas por palet ÷ bases por palet)` : ""}.${cambian ? ` <b>${nf(cambian)}</b> cambian sus cajas por base respecto a la ficha actual.` : ""}` : "Falta la columna de referencia y al menos una de cajas por base, cajas por palet, bases por palet o kg por caja."}</p>
     <div class="row"><button class="btn primary" id="imp-ok" ${valido && out.size ? "" : "disabled"}>Importar ${nf(out.size)} referencias</button><button class="btn" id="imp-cancel">Cancelar</button></div>`;
@@ -784,7 +906,9 @@ function descargarExcel(hojas, nombre) {
 }
 $("#btn-exportar").addEventListener("click", () => {
   const filas = FILAS.map((l) => ({
+    ...(PEDIDO.hojas.length > 1 ? { "Hoja": l.hoja } : {}),
     "Referencia": l.codigo, "Descripción": l.desc, "Kg pedidos": l.kg ? +l.kg.toFixed(3) : "", "Cajas pedidas": l.cajasPed || "",
+    "Unidades pedidas": l.udPed || "", "Palets pedidos": l.palPed || "", "Bulto": l.bulto, "Unidades por caja": l.udCaja ?? "",
     "Kg por caja": l.kgCaja ?? "", "Cajas por base": l.cajasBase ?? "", "Bases por palet": l.basesPalet ?? "",
     "Cajas necesarias": l.cajasNec ?? "", "Bases a enviar": l.bases ?? "", "Cajas que salen": l.cajas ?? "", "Kg que salen": l.kgEnv != null ? +l.kgEnv.toFixed(3) : "",
     "Cajas de más": l.excesoCajas ?? "", "Kg de más": l.excesoKg != null ? +l.excesoKg.toFixed(3) : "", "Palets": textoPalets(l.palets),
@@ -847,14 +971,16 @@ $("#btn-sistema").addEventListener("click", () => {
   const sistema = ok.map((l) => ({
     ...(npedido ? { "Nº pedido": npedido } : {}),
     "Almacén origen": nombreAlm(origen), "Almacén destino": nombreAlm(destino),
-    "Material": l.codigo, "Descripción material": l.desc, "Cantidad": cantidadSistema(l, unidad), "Unidad": unidad,
+    "Material": l.codigo, "Descripción material": l.desc, "Cantidad": cantidadSistema(l, unidad), "Unidad": unidad === "CJ" ? l.bulto : "KG",
   }));
   const detalle = ok.map((l) => ({
-    "Material": l.codigo, "Descripción material": l.desc, "Pedido": textoPedido(l.kg, l.cajasPed), "Cajas por base": l.cajasBase,
-    "Bases": l.bases, "Cajas": l.cajas, "Kg": l.kgEnv != null ? +l.kgEnv.toFixed(3) : "", "Palets": textoPalets(l.palets), "Aviso": l.problemas.join(" · "),
+    ...(PEDIDO.hojas.length > 1 ? { "Hoja": l.hoja } : {}),
+    "Material": l.codigo, "Descripción material": l.desc, "Pedido": textoPedido(l), "Cajas por base": l.cajasBase,
+    "Bases": l.bases, "Cajas": l.cajas, "Bulto": l.bulto, "Kg": l.kgEnv != null ? +l.kgEnv.toFixed(3) : "", "Palets": textoPalets(l.palets), "Aviso": l.problemas.join(" · "),
   }));
   const fuera = [...pendientes(), ...listas().filter((l) => cantidadSistema(l, unidad) == null)].map((l) => ({
-    "Material": l.codigo, "Descripción material": l.desc, "Pedido": textoPedido(l.kg, l.cajasPed), "Motivo": textoEstado(l) === "Listo" ? "Falta kg por caja" : textoEstado(l),
+    ...(PEDIDO.hojas.length > 1 ? { "Hoja": l.hoja } : {}),
+    "Material": l.codigo, "Descripción material": l.desc, "Pedido": textoPedido(l), "Motivo": textoEstado(l) === "Listo" ? "Falta kg por caja" : textoEstado(l),
   }));
   descargarExcel([["Para el sistema", sistema], ["Detalle", detalle], ...(fuera.length ? [["No incluidas", fuera]] : [])], nombreArchivo("traspaso_sistema"));
   toast(`Excel para el sistema: ${ok.length} referencias en ${unidad === "CJ" ? "cajas" : "kilos"}`);
@@ -876,10 +1002,10 @@ $("#btn-hoja").addEventListener("click", () => {
       <div><span>Kilos${conKg ? "" : " (de las que se sabe el peso)"}</span><b>${nf(sum("kgEnv"), 1)} kg</b></div>
     </div>
     <table><thead><tr><th>Nº</th><th>Material</th><th>Descripción</th><th class="n">Bases</th><th class="n">Cajas / base</th><th class="n">Cajas</th><th class="n">Kg</th><th>Palets</th><th>Preparado</th></tr></thead>
-    <tbody>${ok.map((l, i) => `<tr><td>${i + 1}</td><td><b>${esc(l.codigo)}</b></td><td>${esc(l.desc)}${l.problemas.length ? `<br><i>⚠ ${esc(l.problemas.join(" · "))}</i>` : ""}</td>
-      <td class="n grande">${l.bases}</td><td class="n">${l.cajasBase}</td><td class="n grande">${nf(l.cajas)}</td><td class="n">${nf(l.kgEnv, 1)}</td><td>${esc(textoPalets(l.palets))}</td><td><span class="caja"></span></td></tr>`).join("")}
+    <tbody>${ok.map((l, i) => `${PEDIDO.hojas.length > 1 && (i === 0 || ok[i - 1].hoja !== l.hoja) ? `<tr><td colspan="9" class="grupo">${esc(l.hoja)}</td></tr>` : ""}<tr><td>${i + 1}</td><td><b>${esc(l.codigo)}</b></td><td>${esc(l.desc)}${l.problemas.length ? `<br><i>⚠ ${esc(l.problemas.join(" · "))}</i>` : ""}</td>
+      <td class="n grande">${l.bases}</td><td class="n">${l.cajasBase}</td><td class="n grande">${esc(textoBultos(l.cajas, l.bulto))}</td><td class="n">${nf(l.kgEnv, 1)}</td><td>${esc(textoPalets(l.palets))}</td><td><span class="caja"></span></td></tr>`).join("")}
     <tr class="tot"><td colspan="3">Total</td><td class="n">${nf(sum("bases"))}</td><td></td><td class="n">${nf(sum("cajas"))}</td><td class="n">${nf(sum("kgEnv"), 1)}</td><td colspan="2"></td></tr></tbody></table>
-    ${pend.length ? `<h2>No incluidas (faltan datos)</h2><table><thead><tr><th>Material</th><th>Descripción</th><th>Pedido</th><th>Motivo</th></tr></thead><tbody>${pend.map((l) => `<tr><td>${esc(l.codigo)}</td><td>${esc(l.desc)}</td><td>${esc(textoPedido(l.kg, l.cajasPed))}</td><td>${esc(textoEstado(l))}</td></tr>`).join("")}</tbody></table>` : ""}
+    ${pend.length ? `<h2>No incluidas (faltan datos)</h2><table><thead><tr><th>Material</th><th>Descripción</th><th>Pedido</th><th>Motivo</th></tr></thead><tbody>${pend.map((l) => `<tr><td>${esc(l.codigo)}</td><td>${esc(l.desc)}</td><td>${esc(textoPedido(l))}</td><td>${esc(textoEstado(l))}</td></tr>`).join("")}</tbody></table>` : ""}
     <div class="doc-firmas"><div>Preparado por / fecha</div><div>Grabado en el sistema por</div><div>Recibido en destino por / fecha</div></div>
     <div class="doc-pie">Bases completas, siempre igual o más de lo pedido. Generado con el Buscador de artículos de Garcimar.</div>`;
   document.body.classList.add("imprimir-doc");

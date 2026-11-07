@@ -88,6 +88,8 @@ export default async (req) => {
         if ("kgCaja" in v) nuevo.kgCaja = n(v.kgCaja, 2000, false);
         if ("cajasBase" in v) nuevo.cajasBase = n(v.cajasBase, 1000, true);
         if ("basesPalet" in v) nuevo.basesPalet = n(v.basesPalet, 100, true);
+        if ("udCaja" in v) nuevo.udCaja = n(v.udCaja, 100000, false);
+        if ("bulto" in v) nuevo.bulto = texto(v.bulto, 5).toUpperCase() || null;
         if (v.desc) nuevo.desc = texto(v.desc);
         // de dónde sale el dato: importado de la ficha técnica o corregido a mano
         items[k] = { ...nuevo, t, por: v.origen === "importada" ? "Ficha técnica" : "Cambiada a mano" };
