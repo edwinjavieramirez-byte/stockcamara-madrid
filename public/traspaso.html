@@ -170,6 +170,7 @@ ol.pasos li { margin-bottom: 4px; }
     <div class="row" style="margin-top:10px">
       <label class="btn small" id="lbl-import">📂 Importar ficha técnica (Excel)<input type="file" id="in-ficha" class="hidden" accept=".xlsx,.xls,.xlsm,.csv"></label>
       <button class="btn small" id="btn-export-ficha">⬇️ Exportar ficha</button>
+      <button class="btn small" id="btn-bajar-ficha">🔄 Volver a bajar la ficha compartida</button>
     </div>
     <div id="ficha-mapeo" class="hidden" style="margin-top:10px"></div>
     <label class="f" for="ficha-buscar" style="margin-top:14px">Buscar una referencia para ver o cambiar sus cajas por base (si cambia el formato)</label>
@@ -247,6 +248,10 @@ const idb = (() => {
 })();
 
 // ---------- estado ----------
+// Un nombre que es el propio código (p. ej. la columna Descripción apuntando a la del artículo) no vale como nombre
+const nombreValido = (d, ref) => { const t = String(d ?? "").trim(); return t && normArt(t) !== normArt(ref) ? t : ""; };
+// Cambia en cada versión: si dos equipos muestran otra, uno tiene la página antigua (hay que recargarla)
+const VERSION_PAGINA = "7-11-2026 c";
 let AJ = { codigo: "", responsable: false, zona: "08", tema: "" };
 // ficha: items[ref] = { kgCaja, cajasBase, basesPalet, desc, t, por }; ver = versión compartida;
 // pendientes[ref] = lo cambiado en este equipo que aún no ha llegado a la base compartida
@@ -267,8 +272,15 @@ async function api(body) {
 }
 // lo de la base compartida, con lo pendiente de este equipo por encima
 function aplicarServidor(items) {
+  const previos = F.items || {};
   F.items = { ...(items || {}) };
   for (const [ref, c] of Object.entries(F.pendientes)) F.items[ref] = { ...(F.items[ref] || {}), ...c };
+  // el nombre del artículo no se pierde: si este equipo lo tiene y la ficha compartida no, se queda y se sube
+  for (const [ref, p] of Object.entries(previos)) {
+    if (!nombreValido(p?.desc, ref) || !F.items[ref] || nombreValido(F.items[ref].desc, ref)) continue;
+    F.items[ref] = { ...F.items[ref], desc: p.desc };
+    if (puedeEditar()) F.pendientes[ref] = { ...(F.pendientes[ref] || {}), desc: p.desc, origen: F.pendientes[ref]?.origen || "nombre" };
+  }
 }
 let SYNC = { error: "" };
 let colaSync = Promise.resolve();
@@ -294,7 +306,8 @@ async function pasoSync() {
       F.ver = meta.version;
     }
     await guardarFicha();
-    SYNC = { error: "" };
+    SYNC = { error: "", t: Date.now() };
+    if (Object.keys(F.pendientes).length) setTimeout(sincronizar, 500); // nombres recuperados que faltan por subir
   } catch (e) {
     SYNC.error = e instanceof TypeError ? "Sin conexión: se usa la copia de este equipo y se guardará al volver la conexión." : e.message;
   }
@@ -314,7 +327,7 @@ const puedeEditar = () => !!(AJ.codigo && AJ.responsable);
 function ponerFicha(ref, campos, desc, origen = "mano") {
   if (!puedeEditar()) return false;
   const prev = F.items[ref] || {};
-  const d = desc || prev.desc || "";
+  const d = nombreValido(desc, ref) || nombreValido(prev.desc, ref);
   F.items[ref] = { ...prev, ...campos, desc: d, t: Date.now(), por: origen === "importada" ? "Ficha técnica" : "Cambiada a mano" };
   if (AJ.codigo) F.pendientes[ref] = { ...(F.pendientes[ref] || {}), ...campos, ...(d ? { desc: d } : {}), origen };
   return true;
@@ -328,8 +341,12 @@ function pintarFicha() {
   if (SYNC.error) txt = `⚠️ ${SYNC.error}`;
   else if (pend) txt = `Guardando ${pend} ${pend === 1 ? "cambio" : "cambios"} para todos…`;
   else txt = "✅ Guardada en la base compartida. Solo el responsable puede verla y cambiarla.";
-  const sinDesc = Object.values(F.items).filter((i) => (i.cajasBase || i.kgCaja) && !i.desc).length;
-  $("#ficha-estado").innerHTML = `<div><b>${nf(nBase)}</b> referencias con sus cajas por base${n > nBase ? ` <span class="muted">(${nf(n)} con algún dato)</span>` : ""}</div><div class="muted">${esc(txt)}</div>${sinDesc ? `<div class="status" style="margin-top:6px">⚠️ ${nf(sinDesc)} ${sinDesc === 1 ? "referencia de la ficha no tiene" : "referencias de la ficha no tienen"} descripción. Vuelve a importar la cadena logística (botón de abajo) para que salga el nombre de cada artículo.</div>` : ""}`;
+  const sinDesc = Object.entries(F.items).filter(([ref, i]) => (i.cajasBase || i.kgCaja) && !nombreValido(i.desc, ref)).length;
+  const conNombre = Object.entries(F.items).filter(([ref, i]) => nombreValido(i.desc, ref)).length;
+  const fecha = (t) => new Date(t).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  // para comparar dos equipos: los dos deben decir lo mismo
+  const huella = `Ficha compartida ${F.ver ? `del ${fecha(F.ver)}` : "sin bajar todavía"} · ${nf(conNombre)} con nombre · página ${VERSION_PAGINA}`;
+  $("#ficha-estado").innerHTML = `<div><b>${nf(nBase)}</b> referencias con sus cajas por base${n > nBase ? ` <span class="muted">(${nf(n)} con algún dato)</span>` : ""}</div><div class="muted">${esc(txt)}</div><div class="muted" style="font-size:12px;margin-top:2px">${esc(huella)}</div>${sinDesc ? `<div class="status" style="margin-top:6px">⚠️ ${nf(sinDesc)} ${sinDesc === 1 ? "referencia de la ficha no tiene" : "referencias de la ficha no tienen"} descripción. Vuelve a importar la cadena logística (botón de abajo) para que salga el nombre de cada artículo.</div>` : ""}`;
 }
 
 // ---------- stock ----------
@@ -534,6 +551,7 @@ async function cargarPedido(file) {
     if (!hojas.length) hojas.push(libro.sort((a, b) => b.filas.length - a.filas.length)[0]);
     const h0 = hojas[0];
     const mapeo = mapeoRecordado(h0.cab, CAMPOS_PEDIDO, "traspaso-mapeo");
+    if (mapeo.descripcion === mapeo.articulo) delete mapeo.descripcion; // el nombre no puede salir de la columna del código
     if (!("unidad" in mapeo)) { const u = columnaUnidad(h0, mapeo); if (u != null) mapeo.unidad = u; }
     PEDIDO = { archivo: file.name, hojas: hojas.map((h) => ({ ...h, incluida: true })), cab: h0.cab, mapeo, unidadDef: ls.get("traspaso-unidad") || "kg" };
     pintarMapeo();
@@ -601,7 +619,7 @@ function calcular(desdeExcel = false) {
       const r = porRef.get(clave);
       r.kg += Math.max(0, q.kg); r.cajasPed += Math.max(0, q.cajas); r.udPed += Math.max(0, q.ud); r.palPed += Math.max(0, q.pal);
       r.lineas++;
-      if ("descripcion" in m && !r.desc) r.desc = String(fila[m.descripcion] || "").trim();
+      if ("descripcion" in m && m.descripcion !== m.articulo && !r.desc) r.desc = nombreValido(fila[m.descripcion], ref);
       if (desdeExcel && puedeEditar()) {
         const campos = {};
         for (const c of ["kgCaja", "cajasBase", "basesPalet"]) {
@@ -628,7 +646,7 @@ function calcularLinea(r) {
   l.kgCaja = fi.kgCaja || st?.kgCaja || stPide?.kgCaja || null;
   l.kgCajaDe = fi.kgCaja ? "ficha" : st?.kgCaja ? "stock" : stPide?.kgCaja ? "stockPide" : null;
   l.kgVariable = l.kgCajaDe === "stock" ? st.variable : l.kgCajaDe === "stockPide" ? stPide.variable : false;
-  if (!l.desc && stPide) l.desc = stPide.desc;
+  if (!l.desc && stPide) l.desc = nombreValido(stPide.desc, r.ref);
   // cajas por base y bases por palet: solo de la ficha técnica (o lo corregido a mano)
   l.cajasBase = fi.cajasBase || null;
   l.basesPalet = fi.basesPalet || null;
@@ -754,7 +772,7 @@ function editar(ref, campo, valor) {
   if (v != null && !(v > 0)) v = null;
   if (v != null && campo !== "kgCaja") v = Math.round(v);
   const l = FILAS.find((x) => x.ref === ref);
-  ponerFicha(ref, { [campo]: v }, l?.desc || STOCK.porArt.get(ref)?.desc);
+  ponerFicha(ref, { [campo]: v }, l?.desc || descripcionDe(ref));
   cambioFicha();
   if (PEDIDO) {
     FILAS = FILAS.map((x) => (x.ref === ref ? calcularLinea(x) : x));
@@ -776,7 +794,7 @@ function pintarBuscador() {
   const box = $("#ficha-lista");
   if (!q) { box.innerHTML = ""; return; }
   const refs = new Set([...Object.keys(F.items), ...STOCK.porArt.keys()]);
-  const desc = (ref) => F.items[ref]?.desc || STOCK.porArt.get(ref)?.desc || "";
+  const desc = (ref) => descripcionDe(ref);
   const res = [...refs].filter((ref) => norm(ref).includes(q) || norm(desc(ref)).includes(q))
     .sort((a, b) => (norm(a).startsWith(q) ? 0 : 1) - (norm(b).startsWith(q) ? 0 : 1) || a.localeCompare(b, "es", { numeric: true }));
   if (!res.length) { box.innerHTML = `<p class="muted">No hay ninguna referencia con «${esc($("#ficha-buscar").value)}» en la ficha ni en el stock.</p>`; return; }
@@ -868,7 +886,7 @@ function leerImport() {
     if (v("cajasBase") > 0) campos.cajasBase = Math.round(v("cajasBase"));
     else if (v("cajasPalet") > 0 && campos.basesPalet && Number.isInteger(v("cajasPalet") / campos.basesPalet)) { campos.cajasBase = v("cajasPalet") / campos.basesPalet; deducidas++; }
     if (!Object.keys(campos).length) continue;
-    out.set(ref, { campos, desc: "descripcion" in m ? String(fila[m.descripcion] || "").trim() : "" });
+    out.set(ref, { campos, desc: "descripcion" in m && m.descripcion !== m.articulo ? nombreValido(fila[m.descripcion], ref) : "" });
   }
   return { out, deducidas };
 }
@@ -929,9 +947,15 @@ $("#btn-plantilla").addEventListener("click", () => {
     ["Cómo rellenarla", [["Una fila por referencia."], ["Pon los kilos o las cajas que se piden (o las dos cosas: se suman)."], ["La descripción es opcional."], ["Las cajas por base salen de la ficha de bases, no hace falta ponerlas aquí."]]],
   ], "plantilla_pedido_traspaso.xlsx");
 });
+$("#btn-bajar-ficha").addEventListener("click", async () => {
+  F.ver = null; // obliga a bajarla entera; lo pendiente de este equipo se sube antes
+  toast("Bajando la ficha compartida…");
+  await sincronizar();
+  toast(SYNC.error ? SYNC.error : `Ficha al día: ${nf(Object.entries(F.items).filter(([ref, i]) => nombreValido(i.desc, ref)).length)} referencias con nombre`);
+});
 $("#btn-export-ficha").addEventListener("click", () => {
   const filas = Object.entries(F.items).filter(([, i]) => i.kgCaja || i.cajasBase || i.basesPalet).sort(([a], [b]) => a.localeCompare(b, "es", { numeric: true }))
-    .map(([ref, i]) => ({ "Referencia": ref, "Descripción": i.desc || STOCK.porArt.get(ref)?.desc || "", "Cajas por base": i.cajasBase ?? "", "Bases por palet": i.basesPalet ?? "", "Kg por caja": i.kgCaja ?? "",
+    .map(([ref, i]) => ({ "Referencia": ref, "Descripción": descripcionDe(ref), "Cajas por base": i.cajasBase ?? "", "Bases por palet": i.basesPalet ?? "", "Kg por caja": i.kgCaja ?? "",
       "Origen": i.por || "", "Último cambio": i.t ? new Date(i.t).toLocaleDateString("es-ES") : "" }));
   descargarExcel([["Ficha de bases", filas, ["Referencia", "Descripción", "Cajas por base", "Bases por palet", "Kg por caja", "Origen", "Último cambio"]]], `ficha_bases_${hoy()}.xlsx`);
 });
@@ -943,7 +967,7 @@ const motivoPedido = (l) => (l.bases == null ? textoEstado(l) : "falta kg por ca
 // con la cantidad ya ajustada a bases completas y el tipo de cada una (CJ, UD o KG). Lo que no se ha podido calcular
 // se deja como venía y se marca en «Aviso».
 // descripción de un código: la de la ficha técnica; si no, la del stock del que envía o del que pide
-const descripcionDe = (ref) => (ref ? F.items[ref]?.desc || STOCK.porArt.get(ref)?.desc || STOCK_PIDE.porArt?.get(ref)?.desc || "" : "");
+const descripcionDe = (ref) => (ref ? nombreValido(F.items[ref]?.desc, ref) || nombreValido(STOCK.porArt.get(ref)?.desc, ref) || nombreValido(STOCK_PIDE.porArt?.get(ref)?.desc, ref) : "");
 function hojasComoPedido(unidad) {
   const usados = new Set(["Detalle", HOJA_PEDIDO, "Datos del traspaso"]);
   return hojasIncluidas().map((hoja) => {
@@ -952,7 +976,7 @@ function hojasComoPedido(unidad) {
     const ancho = Math.max(hoja.cab.length, ...hoja.filas.map((f) => f.length));
     const cab = Array.from({ length: ancho }, (_, i) => hoja.cab[i] ?? "");
     // la descripción va al lado del artículo; si el pedido ya trae columna de descripción, se rellena la suya
-    const conDesc = "descripcion" in m, junto = "articulo" in m ? m.articulo + 1 : 0;
+    const conDesc = "descripcion" in m && m.descripcion !== m.articulo, junto = "articulo" in m ? m.articulo + 1 : 0;
     const conDescripcion = (f, ref, l) => {
       const d = (l?.desc || descripcionDe(ref)) ?? "";
       if (conDesc) { if (!String(f[m.descripcion] ?? "").trim()) f[m.descripcion] = d; return f; }

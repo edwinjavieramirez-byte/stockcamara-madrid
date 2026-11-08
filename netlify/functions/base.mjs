@@ -90,8 +90,13 @@ export default async (req) => {
         if ("basesPalet" in v) nuevo.basesPalet = n(v.basesPalet, 100, true);
         if ("udCaja" in v) nuevo.udCaja = n(v.udCaja, 100000, false);
         if ("bulto" in v) nuevo.bulto = texto(v.bulto, 5).toUpperCase() || null;
-        if (v.desc) nuevo.desc = texto(v.desc);
-        // de dónde sale el dato: importado de la ficha técnica o corregido a mano
+        // el nombre del artículo; el propio código no vale como nombre (se borra si había quedado así)
+        const desc = texto(v.desc);
+        if (desc && desc.toUpperCase() !== k) nuevo.desc = desc;
+        else if (String(nuevo.desc || "").trim().toUpperCase() === k) delete nuevo.desc;
+        // de dónde sale el dato: importado de la ficha técnica o corregido a mano;
+        // si solo llega el nombre del artículo (lo recupera otro equipo), se queda como estaba
+        if (v.origen === "nombre" && items[k]) { items[k] = nuevo; continue; }
         items[k] = { ...nuevo, t, por: v.origen === "importada" ? "Ficha técnica" : "Cambiada a mano" };
       }
       const version = t;
