@@ -56,6 +56,8 @@ nav button.on { color: #fff; border-bottom-color: #3aa3dc; font-weight: 600; }
 nav a.nav-link { flex: 1; display: flex; align-items: center; justify-content: center; color: #b9cbd8; padding: 10px 4px 12px; font-size: 15px; text-decoration: none; border-bottom: 3px solid transparent; white-space: nowrap; }
 /* con Movimientos y Traspaso, las seis tienen que caber en el ancho de un móvil */
 @media (max-width: 480px) { nav { gap: 0; padding-left: 8px; padding-right: 8px; } nav button, nav a.nav-link { font-size: 13px; padding-left: 3px; padding-right: 3px; } }
+/* el responsable tiene siete pestañas (con Pickings): en el móvil van en dos filas para no tener que hacer la letra más pequeña */
+@media (max-width: 560px) { nav:has(#nav-pick:not(.hidden)) { flex-wrap: wrap; } nav:has(#nav-pick:not(.hidden)) > * { flex: 1 0 25%; padding-top: 8px; padding-bottom: 9px; } }
 main { padding: 16px; max-width: 760px; margin: 0 auto; padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
 /* anotar movimiento: botones grandes para usar con guantes */
 .anotar { border: 2px solid var(--accent); }
@@ -145,6 +147,59 @@ details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
 .destino-pie s { opacity: .8; }
 #resultado { scroll-margin-top: 130px; }
 @keyframes pop { from { transform: scale(.94); } to { transform: none; } }
+/* pickings con más de un artículo */
+.pick-pestanas { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
+.pick-pestanas .btn.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.pick-pestanas .btn.on .badge { background: rgba(255,255,255,.25); color: inherit; }
+.pick { padding: 0; overflow: hidden; }
+.pick-cab { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--warn-bg); border-bottom: 1px solid var(--line); }
+.pick.n3 .pick-cab { background: var(--bad-bg); }
+.pick.hecho .pick-cab { background: var(--ok-bg); }
+.pick-cab .lbl { font-size: 11px; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); }
+.pick-ubi { font: 800 22px/1.15 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .5px; overflow-wrap: anywhere; }
+.pick-num { margin-left: auto; text-align: center; border-radius: 10px; padding: 4px 10px; min-width: 56px; background: var(--warn); color: var(--card); }
+.pick.n3 .pick-num { background: var(--bad); }
+.pick.hecho .pick-num { background: var(--ok); }
+.pick-num b { display: block; font-size: 20px; line-height: 1; }
+.pick-num span { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; }
+.pick-arts { list-style: none; margin: 0; padding: 0 14px; }
+.pick-arts li { border-top: 1px solid var(--line); padding: 10px 0; }
+.pick-arts li:first-child { border-top: 0; }
+.pick-art { display: inline-block; font: 700 14px ui-monospace, "SF Mono", Menlo, Consolas, monospace; background: var(--chip); color: var(--accent); border-radius: 6px; padding: 1px 8px; margin-right: 6px; }
+.pick-stk { margin-top: 6px; font-size: 13px; color: var(--muted); }
+.pick-sl { display: inline-block; font: 13px ui-monospace, "SF Mono", Menlo, Consolas, monospace; background: var(--ok-bg); color: var(--ok); border-radius: 6px; padding: 1px 7px; margin: 3px 4px 0 0; white-space: nowrap; }
+.pick-sl.aqui { background: var(--ok); color: var(--card); }
+.pick-pie { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--line); }
+mark { background: #fde047; color: #14212b; border-radius: 2px; }
+@media print {
+  header, .noprint, .toast, nav { display: none !important; }
+  html, body { background: #fff; }
+  main { padding: 0; max-width: none; }
+  .pick { break-inside: avoid; }
+  .pick-pie .btn { display: none; }
+}
+/* ubicaciones libres: casillas como en la hoja impresa */
+.libre-tag { display: inline-block; background: #ffd23f; color: #14212b; font: 700 12px ui-monospace, "SF Mono", Menlo, Consolas, monospace; padding: 3px 8px; letter-spacing: .05em; }
+.libre-cab { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; border-bottom: 3px solid var(--text); padding-bottom: 10px; margin-bottom: 10px; }
+.libre-total { text-align: right; flex: 0 0 auto; }
+.libre-total b { display: block; font: 800 40px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.libre-total span { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.libre-niveles { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0 0 12px; }
+.libre-niveles label { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.libre-niveles input { width: 20px; height: 20px; accent-color: var(--accent); }
+.libre-fila { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; border-top: 1px solid var(--line); padding: 12px 0; }
+.libre-fila:first-of-type { border-top: 0; }
+.libre-fila > div:first-child b { display: block; font-size: 24px; line-height: 1; }
+.libre-fila > div:first-child span { font-size: 13px; color: var(--muted); }
+.libre-nivel { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; align-items: start; padding: 3px 0; }
+.libre-nivel > span { font-size: 13px; font-weight: 700; text-transform: uppercase; padding-top: 6px; }
+.libre-nivel > span em { display: block; font-style: normal; font-weight: 400; font-size: 11px; color: var(--muted); }
+.libre-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.libre-ch { display: inline-flex; align-items: center; gap: 6px; border: 1.5px solid var(--text); border-radius: 4px; background: var(--card); color: var(--text); padding: 6px 9px 6px 7px; font: 700 15px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; cursor: pointer; }
+.libre-ch i { display: inline-block; width: 11px; height: 11px; border: 1.5px solid currentColor; border-radius: 2px; }
+.libre-ch:active { border-color: var(--accent); color: var(--accent); }
+.libre-none { color: var(--muted); font-size: 14px; padding-top: 6px; }
+@media (max-width: 480px) { .libre-fila { grid-template-columns: 1fr; gap: 6px; } }
 .toast { position: fixed; left: 16px; right: 16px; bottom: 16px; background: #14212b; color: #fff; padding: 12px 14px; border-radius: 12px; z-index: 20; text-align: center; max-width: 520px; margin: 0 auto; }
 </style>
 </head>
@@ -161,6 +216,8 @@ details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
     <button data-tab="escanear" class="on">Escanear</button>
     <button data-tab="movimientos" id="nav-mov" class="hidden">Movimientos<span class="badge" id="nav-mov-n"></span></button>
     <button data-tab="informe">Informe</button>
+    <button data-tab="pickings" id="nav-pick" class="hidden">Pickings</button>
+    <button data-tab="libres">Libres</button>
     <button data-tab="datos">Datos</button>
     <a href="traspaso.html" class="nav-link hidden" id="nav-traspaso">Traspaso</a>
     <button data-tab="ajustes">Ajustes</button>
@@ -233,6 +290,45 @@ details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
     <div class="card"><h2>Movimientos a hacer</h2><p class="muted">Cajas en un picking que no es el suyo y adónde deben ir.</p><div id="inf-mov"></div></div>
     <div class="card"><h2>Pickings con problemas</h2><p class="muted">Ubicaciones de picking con varios artículos o con un artículo que no les corresponde.</p><div id="inf-mezcla"></div></div>
     <div class="card"><h2>Pickings sin su artículo</h2><p class="muted">Pickings asignados donde no hay stock de su artículo, y dónde hay palets para reponer.</p><div id="inf-vacios"></div></div>
+  </section>
+
+  <!-- PICKINGS MULTI-ARTÍCULO (solo responsable) -->
+  <section class="tab" id="tab-pickings">
+    <div class="tiles" id="pick-tiles"></div>
+    <div class="card noprint">
+      <h2>Pickings con más de un artículo</h2>
+      <p class="muted">Ubicaciones de picking que el maestro asigna a varios artículos, y dónde hay stock de cada uno en ubicaciones de picking (sin altura). Sale del maestro y del stock cargados en <b>Datos</b>.</p>
+      <input type="search" id="pick-buscar" placeholder="Buscar picking, artículo, descripción o ubicación de stock" autocomplete="off">
+      <div class="row" style="margin-top:10px">
+        <select id="pick-orden" style="flex:1 1 180px"><option value="ubi">Ordenar por picking</option><option value="n">Más artículos primero</option></select>
+        <button class="btn small" id="btn-pick-export">⬇️ Exportar a Excel</button>
+        <button class="btn small" id="btn-pick-imprimir">🖨️ Imprimir</button>
+      </div>
+    </div>
+    <div class="pick-pestanas noprint">
+      <button class="btn small on" data-pick="pend">Pendientes <span class="badge" id="pick-n-pend">0</span></button>
+      <button class="btn small" data-pick="hecho">Hechos <span class="badge" id="pick-n-hecho">0</span></button>
+      <button class="btn small hidden" id="btn-pick-reset">Volver todos a pendientes</button>
+    </div>
+    <p class="muted" id="pick-cuenta"></p>
+    <div id="pick-lista"></div>
+    <div class="row noprint" style="justify-content:center"><button class="btn hidden" id="btn-pick-mas" style="flex:0 1 auto">Mostrar más</button></div>
+  </section>
+
+  <!-- UBICACIONES LIBRES (todos) -->
+  <section class="tab" id="tab-libres">
+    <div class="card">
+      <span class="libre-tag" id="libres-tag"></span>
+      <div class="libre-cab">
+        <div><h2 style="margin:6px 0 2px">Ubicaciones libres</h2><p class="muted" style="margin:0">Picking vacío y sin ningún artículo asignado: se puede usar para un artículo nuevo.</p></div>
+        <div class="libre-total"><b id="libres-total">—</b><span>ubicaciones</span></div>
+      </div>
+      <div class="libre-niveles" id="libres-niveles"></div>
+      <button class="btn primary big" id="btn-libres-pdf" disabled>🖨️ PDF para imprimir</button>
+      <p class="muted" id="libres-fuente" style="margin:8px 0 0"></p>
+    </div>
+    <div id="libres-avisos"></div>
+    <div id="libres-lista"></div>
   </section>
 
   <!-- DATOS -->
@@ -445,7 +541,7 @@ function filaCabecera(filas) {
 
 // ---------- estado ----------
 let S = {
-  stock: null, maestro: null, vacias: null, maestroManual: [], alias: {}, mapeos: {}, tiposUbi: {}, hechos: [],
+  stock: null, maestro: null, vacias: null, maestroManual: [], alias: {}, mapeos: {}, tiposUbi: {}, hechos: [], pickHechos: {},
   ajustes: { digitos: 1, niveles: "1,2", codigo: "", tema: "", zona: "08", responsable: false }, uso: {},
   colaEv: [], feed: { cursor: "", movs: {} }, baseVer: {}, basePend: [],
 };
@@ -874,7 +970,7 @@ function mostrarResultado(r) {
     }
     S.maestroManual.push(asignacion);
     await guardar("maestroManual");
-    construirIndice(); pintarInforme(); mostrarResultado(r);
+    construirIndice(); pintarInforme(); pintarPickings(); pintarLibres(); mostrarResultado(r);
     toast(`${uTxt} asignado a ${a.articulo}`);
   });
   cont.querySelectorAll("[data-elegir]").forEach((b) => b.addEventListener("click", () => {
@@ -1179,7 +1275,9 @@ function pintarRol() {
   // el traspaso por bases es solo del responsable
   $("#nav-traspaso").classList.toggle("hidden", !S.ajustes.responsable);
   $("#card-traspaso").classList.toggle("hidden", !S.ajustes.responsable);
-  if (!S.ajustes.responsable && $("#tab-movimientos").classList.contains("on")) document.querySelector('nav button[data-tab="escanear"]').click();
+  // los pickings con varios artículos también
+  $("#nav-pick").classList.toggle("hidden", !S.ajustes.responsable);
+  if (!S.ajustes.responsable && ($("#tab-movimientos").classList.contains("on") || $("#tab-pickings").classList.contains("on"))) document.querySelector('nav button[data-tab="escanear"]').click();
   pintarMovimientos(); pintarCargas(); pintarBase(); pintarAjustes();
 }
 async function comprobarRol() {
@@ -1422,6 +1520,8 @@ function mostrarMapeo(tipo, archivo, hojas, hoja, cab, datos, abrir) {
     for (const [c] of def.campos) o[c] = m[c] != null ? fila[m[c]] : "";
     if (o.caducidad instanceof Date || typeof o.caducidad === "number") o.caducidad = normFecha(o.caducidad);
     for (const c of Object.keys(o)) if (o[c] instanceof Date) o[c] = normFecha(o[c]);
+    // Excel guarda la ubicación 0807023011 como el número 807023011: se le devuelve el cero
+    if (typeof o.ubicacion === "number" && Number.isInteger(o.ubicacion) && String(o.ubicacion).length <= 10) o.ubicacion = String(o.ubicacion).padStart(10, "0");
     return o;
   }).filter((o) => def.campos.every(([c, , req]) => !req || String(o[c]).trim() !== ""));
   const prev = () => {
@@ -1552,11 +1652,284 @@ function pintarAjustes() {
     (conTipo.length ? `<br>Tipo conocido de ${conTipo.length} ubicaciones: ${conTipo.filter(Boolean).length} picking, ${conTipo.filter((x) => !x).length} otras.` : "");
   pintarUso();
 }
+// ---------- pickings con más de un artículo (solo responsable) ----------
+// Sale del maestro: una ubicación de picking asignada a varios artículos. El índice solo guarda el último
+// artículo de cada ubicación, así que aquí se vuelve a leer el maestro entero.
+let PICK = { grupos: [], nUbis: 0, nArts: 0, largo: 0 };
+const PICK_VISTA = { pestana: "pend", limite: 60 };
+// «1.234,5» (formato español) o «12.5»: los puntos solo son de miles si hay coma decimal
+const cantidad = (v) => { if (typeof v === "number") return v; let t = String(v ?? "").trim(); if (t.includes(",")) t = t.replace(/\./g, "").replace(",", "."); const n = parseFloat(t); return isNaN(n) ? 0 : n; };
+const fmtCant = (n) => (Math.round(n * 100) / 100).toLocaleString("es-ES");
+function calcularPickings() {
+  const porUbi = new Map(), arts = new Set(), largos = {};
+  for (const m of [...(S.maestro?.filas || []), ...S.maestroManual]) {
+    if (!m.articulo || !m.ubicacion || !enZona(m.ubicacion)) continue;
+    const u = normUbi(m.ubicacion), k = normArt(m.articulo);
+    if (!u || !k) continue;
+    arts.add(k);
+    if (!porUbi.has(u)) { porUbi.set(u, { u, ubi: String(m.ubicacion).trim(), items: [] }); largos[u.length] = (largos[u.length] || 0) + 1; }
+    const g = porUbi.get(u);
+    if (!g.items.some((i) => i.k === k)) g.items.push({ k, articulo: String(m.articulo).trim(), descripcion: m.descripcion || IDX.articulos.get(k)?.descripcion || "" });
+  }
+  const largo = +(Object.entries(largos).sort((a, b) => b[1] - a[1])[0]?.[0] || 0);
+  const grupos = [...porUbi.values()].filter((g) => g.items.length > 1);
+  for (const g of grupos) {
+    g.raro = g.u.length !== largo;
+    g.clave = g.u + "|" + g.items.map((i) => i.k).sort().join(",");
+    for (const it of g.items) it.stock = stockEnPicking(it.k, g.u);
+  }
+  PICK = { grupos, nUbis: porUbi.size, nArts: arts.size, largo };
+}
+// Dónde hay stock del artículo en ubicaciones de picking (sin altura), con su propio picking primero
+function stockEnPicking(k, uPicking) {
+  const a = IDX.articulos.get(k);
+  if (!a) return [];
+  const porU = new Map();
+  for (const f of a.filas) {
+    if (!esPicking(f.ubicacion)) continue;
+    const c = f.cajas === "" || f.cajas == null ? 1 : cantidad(f.cajas);
+    if (c <= 0) continue;
+    if (!porU.has(f.u)) porU.set(f.u, { u: f.u, ubi: verUbi(f.u), cajas: 0, aqui: f.u === uPicking });
+    porU.get(f.u).cajas += c;
+  }
+  return [...porU.values()].sort((x, y) => (y.aqui - x.aqui) || x.u.localeCompare(y.u));
+}
+const pickHecho = (g) => S.pickHechos[g.clave];
+function ordenarPickings(lista) {
+  const porN = $("#pick-orden").value === "n";
+  return [...lista].sort((a, b) => (porN && b.items.length - a.items.length) || a.u.localeCompare(b.u));
+}
+function marcar(txt, q) {
+  const s = String(txt ?? "");
+  if (!q) return esc(s);
+  const i = norm(s).indexOf(q);
+  // norm() puede cambiar la longitud (acentos, signos): solo se resalta si el texto ya coincide tal cual
+  if (i < 0 || norm(s.slice(i, i + q.length)) !== q) return esc(s);
+  return esc(s.slice(0, i)) + "<mark>" + esc(s.slice(i, i + q.length)) + "</mark>" + esc(s.slice(i + q.length));
+}
+function pintarPickings() {
+  calcularPickings();
+  const { grupos } = PICK;
+  const nHechos = grupos.filter(pickHecho).length;
+  const hayStock = !!S.stock;
+  $("#pick-tiles").innerHTML = [
+    [grupos.length - nHechos, `pickings por arreglar (de ${grupos.length})`],
+    [grupos.reduce((n, g) => n + g.items.length, 0), "artículos en esos pickings"],
+    [PICK.nUbis, "pickings en el maestro"], [PICK.nArts, "artículos con picking"],
+  ].map(([n, t]) => `<div class="tile"><b>${n.toLocaleString("es-ES")}</b><span>${t}</span></div>`).join("");
+  $("#pick-n-pend").textContent = grupos.length - nHechos;
+  $("#pick-n-hecho").textContent = nHechos;
+  document.querySelectorAll("[data-pick]").forEach((b) => b.classList.toggle("on", b.dataset.pick === PICK_VISTA.pestana));
+  const enHechos = PICK_VISTA.pestana === "hecho";
+  $("#btn-pick-reset").classList.toggle("hidden", !enHechos || !nHechos);
+
+  const lista = $("#pick-lista");
+  if (!S.maestro?.filas?.length && !S.maestroManual.length) {
+    lista.innerHTML = `<div class="card"><p class="muted" style="margin:0">Carga el maestro de picking en <b>Datos</b>.</p></div>`;
+    $("#pick-cuenta").textContent = ""; $("#btn-pick-mas").classList.add("hidden");
+    return;
+  }
+  const q = norm($("#pick-buscar").value);
+  const datos = ordenarPickings(grupos.filter((g) => !!pickHecho(g) === enHechos && (!q || norm(g.ubi).includes(q) ||
+    g.items.some((it) => norm(`${it.articulo} ${it.descripcion}`).includes(q) || it.stock.some((s) => norm(s.ubi).includes(q))))));
+  const vistos = datos.slice(0, PICK_VISTA.limite);
+  $("#pick-cuenta").textContent = datos.length ? `Mostrando ${vistos.length} de ${datos.length} pickings${hayStock ? "" : " · carga el stock para ver dónde hay de cada artículo"}` : "";
+  $("#btn-pick-mas").classList.toggle("hidden", datos.length <= PICK_VISTA.limite);
+
+  if (!grupos.length) { lista.innerHTML = `<div class="card"><p style="margin:0"><b>Todo correcto 👍</b></p><p class="muted" style="margin:4px 0 0">Ningún picking del maestro tiene más de un artículo asignado.</p></div>`; return; }
+  if (!datos.length) { lista.innerHTML = `<div class="card"><p class="muted" style="margin:0">${q ? "No hay resultados para esa búsqueda." : enHechos ? "Todavía no has marcado ninguno como hecho." : "<b>¡Todo hecho!</b> No quedan pickings pendientes."}</p></div>`; return; }
+  lista.innerHTML = vistos.map((g) => {
+    const h = pickHecho(g), n = g.items.length;
+    return `<div class="card pick${h ? " hecho" : n >= 3 ? " n3" : ""}">
+      <div class="pick-cab"><div><div class="lbl">Picking${h ? " · hecho" : ""}</div><div class="pick-ubi">${marcar(g.ubi, q)}</div>
+        ${g.raro ? `<span class="badge warn">Código de ${g.u.length} caracteres (lo normal son ${PICK.largo})</span>` : ""}</div>
+        <div class="pick-num"><b>${n}</b><span>artículos</span></div></div>
+      <ul class="pick-arts">${g.items.map((it) => `<li><span class="pick-art">${marcar(it.articulo, q)}</span>${marcar(it.descripcion || "(sin descripción)", q)}
+        ${hayStock ? (it.stock.length ? `<div class="pick-stk">Stock en picking:<br>${it.stock.map((s) => `<span class="pick-sl${s.aqui ? " aqui" : ""}"${s.aqui ? ' title="Es este mismo picking"' : ""}>${marcar(s.ubi, q)} · ${fmtCant(s.cajas)} cj</span>`).join("")}</div>`
+          : `<div class="pick-stk"><i>Sin stock en ubicaciones de picking</i></div>`) : ""}</li>`).join("")}</ul>
+      <div class="pick-pie"><span class="muted">${h ? `Hecho el ${esc(new Date(h.fecha).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" }))}` : ""}</span>
+        ${h ? `<button class="btn small" data-pick-deshacer="${esc(g.clave)}">↺ Deshacer</button>` : `<button class="btn small primary" data-pick-hecho="${esc(g.clave)}">✓ Hecho</button>`}</div>
+    </div>`;
+  }).join("");
+}
+function exportarPickings() {
+  if (!PICK.grupos.length) return toast("No hay pickings con varios artículos");
+  const grupos = ordenarPickings(PICK.grupos);
+  const detalle = [], resumen = [];
+  for (const g of grupos) {
+    const h = pickHecho(g), estado = h ? "HECHO" : "PENDIENTE";
+    for (const it of g.items) detalle.push({ "Estado": estado, "Picking": g.ubi, "Nº artículos": g.items.length, "Artículo": it.articulo, "Descripción": it.descripcion,
+      ...(S.stock ? { "Stock en picking": it.stock.length ? it.stock.map((s) => `${s.ubi} (${fmtCant(s.cajas)} cj)`).join("; ") : "Sin stock en ubicaciones de picking" } : {}) });
+    resumen.push({ "Estado": estado, "Fecha hecho": h ? new Date(h.fecha).toLocaleString("es-ES") : "", "Picking": g.ubi, "Nº artículos": g.items.length, "Artículos": g.items.map((i) => i.articulo).join(", ") });
+  }
+  const wb = XLSX.utils.book_new();
+  const hoja = (filas, nombre, anchos) => { const ws = XLSX.utils.json_to_sheet(filas); ws["!cols"] = anchos.map((wch) => ({ wch })); ws["!autofilter"] = { ref: ws["!ref"] }; XLSX.utils.book_append_sheet(wb, ws, nombre); };
+  hoja(detalle, "Detalle", [12, 18, 12, 12, 50, 60]);
+  hoja(resumen, "Resumen", [12, 17, 18, 12, 60]);
+  XLSX.writeFile(wb, `pickings_varios_articulos_${S.ajustes.zona}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+// ---------- ubicaciones libres (todos) ----------
+// Libres = vacías (Excel de vacías) − asignadas (maestro), solo picking del almacén elegido.
+// Si el Excel de stock dice que hay mercancía, tampoco sale: el de vacías puede estar desfasado.
+const LIBRES_VISTA = { fuera: new Set() }; // niveles desmarcados
+let LIBRES = null;
+// una ubicación de 9 cifras que no empieza por 0 es una de 10 a la que Excel le quitó el cero
+const codUbi = (u) => { const c = normUbi(u); return /^\d{9}$/.test(c) && c[0] !== "0" ? "0" + c : c; };
+const nombreNivel = (n) => (n === 1 ? "Suelo" : n === 2 ? "Altura" : `Nivel ${pad(n)}`);
+function calcularLibres() {
+  const asignadas = new Set(), malas = [], vistasMalas = new Set();
+  for (const m of [...(S.maestro?.filas || []), ...S.maestroManual]) {
+    const c = codUbi(m.ubicacion);
+    if (!c) continue;
+    if (!partesUbi(m.ubicacion) && !partesUbi(c)) {
+      const clave = c + "|" + m.articulo;
+      if (!vistasMalas.has(clave)) { vistasMalas.add(clave); malas.push({ ubi: String(m.ubicacion).trim(), art: String(m.articulo ?? "").trim() }); }
+      continue;
+    }
+    asignadas.add(c);
+  }
+  const z = normUbi(S.ajustes.zona), vistas = new Set(), lista = [], conStock = [], niveles = new Set();
+  for (const v of S.vacias?.filas || []) {
+    const c = codUbi(v.ubicacion), p = partesUbi(v.ubicacion) || partesUbi(c);
+    if (!c || !p || vistas.has(c) || (z && !c.startsWith(z))) continue;
+    vistas.add(c);
+    if (!(TIPO_UBI.get(normUbi(v.ubicacion)) ?? esPicking(c))) continue; // la reserva nunca tiene artículo asignado
+    if (asignadas.has(c)) continue;
+    if (IDX.stockPorUbi.has(c)) { conStock.push(c); continue; }
+    const nivel = parseInt(p.nivel, 10);
+    if (isNaN(nivel)) continue;
+    niveles.add(nivel);
+    lista.push({ c, fila: p.fila, hueco: p.hueco, nivel });
+  }
+  lista.sort((a, b) => a.c.localeCompare(b.c));
+  LIBRES = { lista, malas, conStock, niveles: [...niveles].sort((a, b) => a - b) };
+}
+// Lo que sale con los niveles marcados, agrupado por fila: [{ fila, porNivel: Map(nivel -> [huecos]) }]
+function libresVisibles() {
+  const nivs = LIBRES.niveles.filter((n) => !LIBRES_VISTA.fuera.has(n));
+  const filas = new Map();
+  let total = 0;
+  for (const x of LIBRES.lista) {
+    if (!nivs.includes(x.nivel)) continue;
+    if (!filas.has(x.fila)) filas.set(x.fila, new Map(nivs.map((n) => [n, []])));
+    filas.get(x.fila).get(x.nivel).push(x);
+    total++;
+  }
+  const orden = [...filas.keys()].sort((a, b) => (parseInt(a, 10) - parseInt(b, 10)) || a.localeCompare(b));
+  return { nivs, total, filas: orden.map((fila) => ({ fila, porNivel: filas.get(fila) })) };
+}
+const hoyTxt = () => new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
+const ciudadAlmacen = () => nombreAlmacen(S.ajustes.zona).replace(/^Garcimar\s+/i, "").toUpperCase();
+function pintarLibres() {
+  calcularLibres();
+  $("#libres-tag").textContent = `ALMACÉN ${S.ajustes.zona} · ${ciudadAlmacen()} · ${hoyTxt()}`;
+  const faltan = [!S.vacias?.filas?.length && "el Excel de ubicaciones vacías", !S.maestro?.filas?.length && !S.maestroManual.length && "el maestro de picking"].filter(Boolean);
+  const lectura = soloLectura();
+  $("#libres-fuente").textContent = faltan.length ? "" : `Vacías: ${S.vacias.archivo || "—"}${S.vacias.fecha ? ` (${new Date(S.vacias.fecha).toLocaleDateString("es-ES")})` : ""} · Maestro: ${S.maestro?.archivo || "asignaciones de la app"}${S.maestro?.fecha ? ` (${new Date(S.maestro.fecha).toLocaleDateString("es-ES")})` : ""}`;
+  $("#libres-niveles").innerHTML = LIBRES.niveles.map((n) => `<label><input type="checkbox" data-nivel="${n}" ${LIBRES_VISTA.fuera.has(n) ? "" : "checked"}> ${nombreNivel(n)} · nivel ${pad(n)}</label>`).join("");
+  if (faltan.length) {
+    $("#libres-total").textContent = "—"; $("#btn-libres-pdf").disabled = true; $("#libres-avisos").innerHTML = "";
+    $("#libres-lista").innerHTML = `<div class="card"><p class="muted" style="margin:0">Falta ${faltan.join(" y ")}. ${lectura ? `Lo${faltan.length > 1 ? "s" : ""} carga el responsable en <b>Datos</b> y te llega${faltan.length > 1 ? "n" : ""} solo${faltan.length > 1 ? "s" : ""}.` : `Cárga${faltan.length > 1 ? "los" : "lo"} en <b>Datos</b>.`}</p></div>`;
+    return;
+  }
+  const v = libresVisibles();
+  $("#libres-total").textContent = v.total.toLocaleString("es-ES");
+  $("#btn-libres-pdf").disabled = !v.total;
+
+  const avisos = [];
+  if (LIBRES.malas.length) avisos.push(`<div class="verdict warn" style="font-size:15px;font-weight:500"><b>${LIBRES.malas.length} ${LIBRES.malas.length === 1 ? "ubicación mal escrita" : "ubicaciones mal escritas"} en el maestro:</b>
+    ${LIBRES.malas.slice(0, 8).map((m) => `<span class="mono">${esc(m.ubi)}</span>${m.art ? ` (art. ${esc(m.art)})` : ""}`).join(", ")}${LIBRES.malas.length > 8 ? "…" : ""}.
+    Esos artículos no cuentan como asignados: si su picking real está vacío, saldrá aquí como libre. Hay que corregirlo en el maestro.</div>`);
+  if (LIBRES.conStock.length) avisos.push(`<details class="card"><summary>${LIBRES.conStock.length} vacías sin asignar no salen porque el Excel de stock dice que tienen mercancía</summary>
+    <p class="muted">Puede que el Excel de vacías o el de stock estén desfasados.</p><p class="mono">${LIBRES.conStock.map((c) => esc(verUbi(c))).join(", ")}</p></details>`);
+  $("#libres-avisos").innerHTML = avisos.join("");
+
+  if (!v.total) { $("#libres-lista").innerHTML = `<div class="card"><p class="muted" style="margin:0">No hay ninguna ubicación de picking vacía y sin asignar${v.nivs.length < LIBRES.niveles.length ? " con los niveles marcados" : ""}.</p></div>`; return; }
+  $("#libres-lista").innerHTML = `<div class="card"><p class="muted" style="margin:0 0 4px">Toca una ubicación para copiar su código.</p>${v.filas.map(({ fila, porNivel }) => {
+    const n = [...porNivel.values()].reduce((a, l) => a + l.length, 0);
+    return `<div class="libre-fila"><div><b>Fila ${esc(fila)}</b><span>${n} ${n === 1 ? "ubicación" : "ubicaciones"}</span></div><div>${[...porNivel].map(([nv, l]) => `<div class="libre-nivel"><span>${nombreNivel(nv)}<em>nivel ${pad(nv)}</em></span>
+      <div class="libre-chips">${l.length ? l.map((x) => `<button class="libre-ch" data-copiar="${esc(codigoSistema(x.c))}" title="${esc(verUbi(x.c))}"><i></i>${esc(x.hueco)}</button>`).join("") : `<span class="libre-none">Ninguna</span>`}</div></div>`).join("")}</div></div>`;
+  }).join("")}</div>`;
+}
+// jsPDF solo se descarga la primera vez que se pide el PDF
+let jsPdfListo = null;
+function cargarJsPdf() {
+  if (window.jspdf) return Promise.resolve(window.jspdf);
+  return (jsPdfListo ||= new Promise((res, rej) => {
+    const sc = document.createElement("script");
+    sc.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    sc.onload = () => (window.jspdf ? res(window.jspdf) : rej(new Error("sin jsPDF")));
+    sc.onerror = () => { jsPdfListo = null; rej(new Error("sin conexión")); };
+    document.head.appendChild(sc);
+  }));
+}
+// Hoja A4 como la de la herramienta original: casillas de 16 × 6,2 mm, 7 por línea, una fila nunca se parte entre páginas
+function hojaLibres(jsPDF, v) {
+  const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
+  const M = 11, W = 210, H = 297, X0 = 68, X1 = W - M, CW = 16, CH = 6.2, GAP = 2, RH = CH + 2;
+  const porLinea = Math.floor((X1 - X0 + GAP) / (CW + GAP));
+  const tinta = [21, 26, 23], gris = [93, 104, 98], raya = [185, 192, 187];
+  const fuente = (k, w, pt) => { doc.setFont(k === "mono" ? "courier" : "helvetica", w); doc.setFontSize(pt); };
+  const linea = (x1, y1, x2, y2, c, lw) => { doc.setDrawColor(...c); doc.setLineWidth(lw); doc.line(x1, y1, x2, y2); };
+  let y = M;
+  const tag = `ALMACÉN ${S.ajustes.zona} · ${ciudadAlmacen()} · ${hoyTxt()}`;
+  fuente("mono", "bold", 8); doc.setFillColor(255, 210, 63); doc.rect(M, y, doc.getTextWidth(tag) + 4, 5, "F");
+  doc.setTextColor(...tinta); doc.text(tag, M + 2, y + 3.6);
+  fuente("sans", "bold", 24); doc.text("UBICACIONES LIBRES", M, y + 15);
+  fuente("sans", "normal", 10.5); doc.setTextColor(...gris);
+  doc.text(`Picking ${v.nivs.map((n) => nombreNivel(n).toLowerCase()).join(" y ")} · Vacías y sin artículo asignado`, M, y + 21);
+  doc.setTextColor(...tinta); fuente("mono", "bold", 32); doc.text(String(v.total), X1, y + 15, { align: "right" });
+  fuente("sans", "bold", 9); doc.text("UBICACIONES", X1, y + 21, { align: "right" });
+  y += 24; linea(M, y, X1, y, tinta, 0.8); y += 4;
+  fuente("sans", "normal", 9.5); doc.setTextColor(...gris);
+  doc.text("Estas ubicaciones de picking no tienen stock ni artículo asignado. Están disponibles para asignar artículos nuevos.", M, y + 3);
+  y += 8;
+  for (const { fila, porNivel } of v.filas) {
+    const alto = [...porNivel.values()].reduce((a, l) => a + Math.max(1, Math.ceil(l.length / porLinea)) * RH + 1, 0) + 4;
+    if (y + alto > H - 14) { doc.addPage(); y = M; }
+    const y0 = y + 3;
+    doc.setTextColor(...tinta); fuente("sans", "bold", 18); doc.text(`FILA ${fila}`, M, y0 + 5);
+    const n = [...porNivel.values()].reduce((a, l) => a + l.length, 0);
+    fuente("sans", "bold", 9.5); doc.text(`${n} ${n === 1 ? "ubicación" : "ubicaciones"}`, M, y0 + 10);
+    let ly = y0;
+    for (const [nv, l] of porNivel) {
+      fuente("sans", "bold", 9); doc.setTextColor(...tinta); doc.text(nombreNivel(nv).toUpperCase(), 45, ly + 3.8);
+      fuente("mono", "normal", 7); doc.setTextColor(...gris); doc.text(`NIVEL ${pad(nv)}`, 45, ly + 7);
+      if (!l.length) { fuente("sans", "normal", 9.5); doc.text("Ninguna", X0, ly + 4.2); ly += RH + 1; continue; }
+      fuente("mono", "bold", 11); doc.setTextColor(...tinta); doc.setDrawColor(...tinta); doc.setLineWidth(0.35);
+      l.forEach((x, i) => {
+        const cx = X0 + (i % porLinea) * (CW + GAP), cy = ly + Math.floor(i / porLinea) * RH;
+        doc.roundedRect(cx, cy, CW, CH, 0.8, 0.8, "S");
+        doc.rect(cx + 1.4, cy + 1.8, 2.6, 2.6, "S");
+        doc.text(String(x.hueco), cx + 5.2, cy + 4.4);
+      });
+      ly += Math.ceil(l.length / porLinea) * RH + 1;
+    }
+    y = Math.max(ly, y0 + 12) + 2;
+    linea(M, y, X1, y, raya, 0.25);
+  }
+  const paginas = doc.getNumberOfPages();
+  for (let pg = 1; pg <= paginas; pg++) { doc.setPage(pg); fuente("sans", "normal", 7.5); doc.setTextColor(...gris); doc.text(`Ubicaciones libres · página ${pg} de ${paginas}`, W / 2, H - 6, { align: "center" }); }
+  return doc;
+}
+async function pdfLibres() {
+  const v = libresVisibles();
+  if (!v.total) return;
+  const b = $("#btn-libres-pdf"); b.disabled = true;
+  try {
+    const { jsPDF } = await cargarJsPdf();
+    const d = new Date();
+    hojaLibres(jsPDF, v).save(`ubicaciones_libres_${S.ajustes.zona}_${pad(d.getDate())}${pad(d.getMonth() + 1)}.pdf`);
+  } catch (e) { toast(`No he podido preparar el PDF (${e.message}). Comprueba la conexión.`); }
+  finally { b.disabled = false; }
+}
+
 function refrescar() {
   construirIndice();
   pintarAlmacen();
   $("#aviso-sin-datos").classList.toggle("hidden", !!S.stock);
-  pintarCargas(); pintarInforme(); pintarAjustes();
+  pintarCargas(); pintarInforme(); pintarPickings(); pintarLibres(); pintarAjustes();
 }
 
 document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click", () => {
@@ -1599,6 +1972,37 @@ $("#in-galeria").addEventListener("change", (e) => { procesarFoto(e.target.files
 $("#ubi-actual").addEventListener("change", (e) => { try { localStorage.setItem("ubiActual", e.target.value); } catch {} if (ULTIMO) mostrarResultado(ULTIMO); });
 $("#buscar").addEventListener("input", (e) => buscar(e.target.value));
 $("#filtro-informe").addEventListener("input", pintarInforme);
+$("#pick-buscar").addEventListener("input", () => { PICK_VISTA.limite = 60; pintarPickings(); });
+$("#pick-orden").addEventListener("change", pintarPickings);
+$("#btn-pick-mas").addEventListener("click", () => { PICK_VISTA.limite += 120; pintarPickings(); });
+$("#btn-pick-export").addEventListener("click", exportarPickings);
+$("#btn-pick-imprimir").addEventListener("click", () => { const l = PICK_VISTA.limite; PICK_VISTA.limite = 1e6; pintarPickings(); window.print(); PICK_VISTA.limite = l; pintarPickings(); });
+$("#btn-pick-reset").addEventListener("click", async () => {
+  if (!confirm("¿Volver a poner todos los pickings hechos como pendientes?")) return;
+  for (const g of PICK.grupos) delete S.pickHechos[g.clave];
+  await guardar("pickHechos"); PICK_VISTA.pestana = "pend"; pintarPickings();
+});
+$("#btn-libres-pdf").addEventListener("click", pdfLibres);
+$("#libres-niveles").addEventListener("change", (e) => {
+  const n = +e.target.dataset.nivel;
+  if (e.target.checked) LIBRES_VISTA.fuera.delete(n); else LIBRES_VISTA.fuera.add(n);
+  pintarLibres();
+});
+$("#libres-lista").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-copiar]");
+  if (!b) return;
+  await copiar(b.dataset.copiar); toast(`Copiado: ${b.dataset.copiar}`);
+});
+$("#tab-pickings").addEventListener("click", async (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.pick) { PICK_VISTA.pestana = b.dataset.pick; PICK_VISTA.limite = 60; pintarPickings(); return; }
+  // la clave lleva el picking y sus artículos: si en un maestro nuevo cambia la asignación, vuelve a pendientes
+  if (b.dataset.pickHecho) S.pickHechos[b.dataset.pickHecho] = { fecha: Date.now() };
+  else if (b.dataset.pickDeshacer) delete S.pickHechos[b.dataset.pickDeshacer];
+  else return;
+  await guardar("pickHechos"); pintarPickings();
+});
 $("#btn-export-mov").addEventListener("click", exportarMovimientos);
 $("#btn-export-hechos").addEventListener("click", () => {
   const hechos = hechosAlmacen();
@@ -1639,7 +2043,7 @@ const guardarAjustes = () => {
   S.ajustes.digitos = Math.max(1, Math.min(3, +$("#aj-digitos").value || 1));
   S.ajustes.niveles = $("#aj-niveles").value;
   S.ajustes.tema = $("#aj-tema").value;
-  guardar("ajustes"); aplicarTema(); construirIndice(); pintarCargas(); pintarInforme(); pintarAjustes();
+  guardar("ajustes"); aplicarTema(); construirIndice(); pintarCargas(); pintarInforme(); pintarPickings(); pintarLibres(); pintarAjustes();
   if (S.ajustes.responsable && JSON.stringify(datosBase("ajustes")) !== antes) subirBase(["ajustes"]);
 };
 ["#aj-digitos", "#aj-niveles", "#aj-tema"].forEach((s) => $(s).addEventListener("change", guardarAjustes));
@@ -1658,9 +2062,9 @@ $("#btn-borrar-todo").addEventListener("click", async () => {
   if (!confirm("¿Borrar todos los Excel, alias y asignaciones de este móvil?")) return;
   // la cola no se borra: lo anotado sin cobertura se sigue enviando, y el historial compartido se vuelve a leer del servidor
   // la base compartida no se toca: este dispositivo la vuelve a descargar
-  for (const k of ["maestroManual", "alias", "mapeos", "hechos", "feed"]) await store.del(k);
+  for (const k of ["maestroManual", "alias", "mapeos", "hechos", "feed", "pickHechos"]) await store.del(k);
   for (const k of POR_ALMACEN) for (const z of Object.keys(ALMACENES)) await store.del(`${k}@${z}`);
-  S.stock = S.maestro = S.vacias = null; S.maestroManual = []; S.alias = {}; S.mapeos = {}; S.tiposUbi = {}; S.hechos = []; S.feed = { cursor: "", movs: {} }; S.baseVer = {}; S.basePend = [];
+  S.stock = S.maestro = S.vacias = null; S.maestroManual = []; S.alias = {}; S.mapeos = {}; S.tiposUbi = {}; S.hechos = []; S.pickHechos = {}; S.feed = { cursor: "", movs: {} }; S.baseVer = {}; S.basePend = [];
   refrescar(); pintarMovimientos(); toast("Datos borrados");
   sincronizarBase();
 });

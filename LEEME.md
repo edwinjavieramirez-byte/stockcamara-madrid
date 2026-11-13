@@ -61,6 +61,33 @@ Cada almacén tiene su propia base. El responsable elige el almacén y carga sus
 - **Dónde están los datos:** los movimientos (artículo, lote, caducidad, cajas, UA) se guardan en Netlify Blobs.
 - **Consumo:** solo se consulta cada 10 segundos mientras la pestaña está a la vista. Cada despliegue gasta 15 créditos, así que sube los cambios de una vez.
 
+## Pickings con más de un artículo
+
+Pestaña **Pickings**, solo con el código de responsable (antes era la herramienta suelta `Pickings_multi_articulo.html`). No hay que cargar nada más: usa el **maestro de picking** y el **stock** del almacén elegido que ya están en **Datos**.
+
+1. Muestra cada ubicación de picking que el maestro asigna a **más de un artículo** (incluye las asignaciones hechas desde la app). Las de 3 o más artículos salen en rojo. Si el código de una ubicación tiene otra longitud que la mayoría, se avisa.
+2. Con el stock cargado, debajo de cada artículo sale **dónde hay stock en ubicaciones de picking** (las de altura no cuentan, según los niveles de picking de Ajustes) y cuántas cajas. En verde oscuro, si es el mismo picking.
+3. **✓ Hecho** lo pasa a la lista de **Hechos** con la fecha; **Deshacer** lo devuelve. Si en un maestro nuevo cambian los artículos de ese picking, vuelve a pendientes solo.
+4. Buscador (picking, artículo, descripción o ubicación de stock), orden por picking o por número de artículos, **Exportar a Excel** (hojas Detalle y Resumen) e **Imprimir**.
+
+- **Diferencia con el Informe:** «Pickings con problemas» del Informe mira el **stock** (cajas de varios artículos en un picking). Esta pestaña mira el **maestro** (un picking asignado a varios artículos).
+- **Dónde están los datos:** los «Hechos» se guardan solo en ese dispositivo.
+- **Coste:** ninguno.
+
+## Ubicaciones libres
+
+Pestaña **Libres**, para todos (operarios y responsable). Antes era la herramienta suelta «Ubicaciones libres». No hay que cargar nada más: usa el **Excel de ubicaciones vacías** y el **maestro de picking** del almacén elegido, los mismos de **Datos** que el responsable comparte con todos.
+
+1. Saca las ubicaciones de **picking** que están **vacías y no tienen ningún artículo asignado** en el maestro (incluidas las asignaciones hechas desde la app), agrupadas por fila y nivel (suelo 01, altura 02). La reserva nunca sale. Qué es picking lo dice la columna de tipo del Excel de vacías; si no la trae, los niveles de picking de Ajustes.
+2. Se puede quitar un nivel con su casilla.
+3. Tocar una ubicación copia su código para el sistema (con el 99 delante, como en Movimientos).
+4. **PDF para imprimir:** hoja A4 con casillas para marcar, igual que la de la herramienta original (`ubicaciones_libres_08_DDMM.pdf`). La primera vez descarga el generador de PDF, así que necesita conexión.
+
+- **Ubicaciones mal escritas en el maestro** (que no tienen el formato `AA-FF-HHH-NN-1`): salen en un aviso amarillo con su artículo. Esos artículos no cuentan como asignados, así que si su picking real está vacío saldrá como libre. Hay que corregirlo en el maestro.
+- **Con stock:** si el Excel de stock dice que una vacía sin asignar tiene mercancía, no sale como libre y se avisa aparte, porque alguno de los dos Excel está desfasado.
+- **Ceros perdidos:** si Excel guarda una ubicación como número (807023011 en vez de 0807023011), al cargarla se le devuelve el cero.
+- **Coste:** ninguno.
+
 ## Traspaso por bases
 
 Página `public/traspaso.html` (en la app: pestaña **Traspaso**, o **Datos → Calcular bases de un traspaso**). Sirve para preparar lo que pide otro almacén enviando bases completas, siempre igual o más de lo pedido. No usa fotos ni la IA: todo sale de la ficha técnica y del stock.

@@ -75,6 +75,8 @@ function mensajeError(e) {
   if (e instanceof Anthropic.NotFoundError) return "Modelo de Claude no disponible. Revisa CLAUDE_MODEL en Netlify.";
   if (e instanceof Anthropic.RateLimitError) return "Demasiadas fotos seguidas o límite de gasto alcanzado. Espera un momento y repite.";
   if (e instanceof Anthropic.APIConnectionError) return "No se ha podido conectar con Claude. Repite la foto.";
+  // 5xx: fallo de Anthropic (a veces dice «credential validation failed» aunque la clave esté bien)
+  if (e instanceof Anthropic.InternalServerError) return `Claude tiene un fallo temporal en sus servidores (error ${e.status}). No es tu clave ni la app: repite la foto en unos minutos.`;
   if (e instanceof Anthropic.APIError) return `Claude ha devuelto un error (${e.status}): ${e.error?.error?.message || e.message}`;
   return e.message || "Error al llamar a Claude";
 }
