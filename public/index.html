@@ -54,30 +54,10 @@ nav button { flex: 1; background: none; border: 0; color: #b9cbd8; padding: 10px
 nav button.on { color: #fff; border-bottom-color: #3aa3dc; font-weight: 600; }
 /* Traspaso es otra página: un enlace con el mismo aspecto que las pestañas */
 nav a.nav-link { flex: 1; display: flex; align-items: center; justify-content: center; color: #b9cbd8; padding: 10px 4px 12px; font-size: 15px; text-decoration: none; border-bottom: 3px solid transparent; white-space: nowrap; }
-/* con Movimientos y Traspaso, las seis tienen que caber en el ancho de un móvil */
-@media (max-width: 480px) { nav { gap: 0; padding-left: 8px; padding-right: 8px; } nav button, nav a.nav-link { font-size: 13px; padding-left: 3px; padding-right: 3px; } }
-/* el responsable tiene siete pestañas (con Pickings): en el móvil van en dos filas para no tener que hacer la letra más pequeña */
-@media (max-width: 560px) { nav:has(#nav-pick:not(.hidden)) { flex-wrap: wrap; } nav:has(#nav-pick:not(.hidden)) > * { flex: 1 0 25%; padding-top: 8px; padding-bottom: 9px; } }
+/* en el móvil las pestañas van en dos filas para no tener que hacer la letra más pequeña:
+   seis (3 + 3) para todos, ocho (4 + 4) para el responsable, que además tiene Pickings y Traspaso */
+@media (max-width: 560px) { nav { flex-wrap: wrap; gap: 0; padding-left: 8px; padding-right: 8px; } nav > * { flex: 1 0 33%; padding-top: 8px; padding-bottom: 9px; } nav:has(#nav-pick:not(.hidden)) > * { flex-basis: 25%; } }
 main { padding: 16px; max-width: 760px; margin: 0 auto; padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
-/* anotar movimiento: botones grandes para usar con guantes */
-.anotar { border: 2px solid var(--accent); }
-.stepper { display: grid; grid-template-columns: 64px 1fr 64px; gap: 8px; }
-.stepper .btn { font-size: 28px; font-weight: 700; padding: 6px 0; }
-.stepper input { text-align: center; font-size: 30px; font-weight: 800; padding: 8px; }
-li.hecho { opacity: .55; }
-/* movimientos en directo: cada dato se copia con un toque */
-.mov { border-top: 1px solid var(--line); padding: 12px 0; }
-.mov:first-child { border-top: 0; }
-.mov-nom { font-size: 14px; color: var(--muted); margin: 6px 0 8px; }
-.copias { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; }
-.copia { display: block; text-align: left; min-width: 0; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; background: var(--bg); color: var(--text); font: inherit; cursor: pointer; }
-button.copia:active { border-color: var(--accent); }
-.copia span { display: block; font-size: 12px; color: var(--muted); }
-.copia b { display: block; font-size: 16px; overflow-wrap: anywhere; }
-.copia.destacada { background: var(--chip); border-color: var(--accent); }
-.mov-pie { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; }
-#nav-mov-n:empty { display: none; }
-#nav-mov-n { margin-left: 4px; color: var(--text); }
 section.tab { display: none; }
 section.tab.on { display: block; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
@@ -146,6 +126,15 @@ details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
 .destino-pie { margin-top: 12px; font-size: 15px; opacity: .95; }
 .destino-pie s { opacity: .8; }
 #resultado { scroll-margin-top: 130px; }
+/* stock del artículo escaneado, por ubicación */
+.stk .tiles { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+.tile.bad { background: var(--bad-bg); border-color: var(--bad); }
+.tile.bad b, .tile.bad span { color: var(--bad); }
+.stk-cab { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.stk-ubi { font: 700 16px ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.stk-cj { margin-left: auto; font-size: 17px; white-space: nowrap; }
+.stk-u.aqui { background: var(--chip); margin: 0 -14px; padding-left: 14px; padding-right: 14px; }
+.stk-aviso { color: var(--bad); font-weight: 700; font-size: 14px; margin-top: 2px; }
 @keyframes pop { from { transform: scale(.94); } to { transform: none; } }
 /* pickings con más de un artículo */
 .pick-pestanas { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
@@ -177,6 +166,38 @@ mark { background: #fde047; color: #14212b; border-radius: 2px; }
   main { padding: 0; max-width: none; }
   .pick { break-inside: avoid; }
   .pick-pie .btn { display: none; }
+}
+/* descargas: listado de pedidos con su picking */
+.ped-titulo { margin: 0 0 12px; }
+.ped-titulo h2 { margin: 0; font-size: 18px; letter-spacing: .3px; }
+.ped-titulo p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.ped { background: var(--card); border: 1px solid var(--line); border-radius: 12px; margin: 0 0 12px; overflow: hidden; }
+.ped-cab { display: flex; flex-wrap: wrap; gap: 2px 16px; align-items: baseline; padding: 9px 12px; background: var(--chip); font-size: 13px; }
+.ped-cab b { font-size: 15px; margin-right: auto; }
+.ped-cab span { color: var(--muted); white-space: nowrap; }
+.ped-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ped-tbl th { text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .3px; padding: 6px; }
+.ped-tbl td { padding: 6px; border-top: 1px solid var(--line); vertical-align: top; }
+.ped-tbl .num { text-align: right; white-space: nowrap; }
+.ped-tbl .cod { font: 700 13px ui-monospace, "SF Mono", Menlo, Consolas, monospace; white-space: nowrap; }
+.ped-tbl tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
+.ped-pk { font: 800 15px ui-monospace, "SF Mono", Menlo, Consolas, monospace; white-space: nowrap; color: var(--accent); }
+.ped-pk + .ped-pk { margin-top: 2px; }
+.ped-sin { display: inline-block; font-size: 12px; font-weight: 700; color: var(--warn); background: var(--warn-bg); border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+@media screen and (max-width: 700px) { .ped-tbl .imp { display: none; } }
+@media print {
+  @page { margin: 10mm; }
+  #ped-doc, #ped-doc * { color: #000 !important; background: transparent !important; }
+  .ped { border: 0; border-radius: 0; margin: 0 0 9px; break-inside: avoid; }
+  .ped-cab { border-bottom: 1.5px solid #000; padding: 3px 0; font-size: 9pt; }
+  .ped-cab b { font-size: 10pt; }
+  .ped-tbl { font-size: 8.5pt; }
+  .ped-tbl thead { display: table-header-group; }
+  .ped-tbl th { font-size: 7pt; padding: 3px 4px; }
+  .ped-tbl td { padding: 3px 4px; border-top-color: #bbb; }
+  .ped-tbl .cod { font-size: 8.5pt; }
+  .ped-pk { font-size: 10.5pt; }
+  .ped-sin { border: 1px solid #000; }
 }
 /* ubicaciones libres: casillas como en la hoja impresa */
 .libre-tag { display: inline-block; background: #ffd23f; color: #14212b; font: 700 12px ui-monospace, "SF Mono", Menlo, Consolas, monospace; padding: 3px 8px; letter-spacing: .05em; }
@@ -214,7 +235,7 @@ mark { background: #fde047; color: #14212b; border-radius: 2px; }
   <div class="marca"><img src="logo-garcimar.png" alt="Garcimar" width="104" height="44"><div class="marca-txt"><span>Buscador de artículos</span><button id="btn-almacen" aria-label="Cambiar de almacén"></button></div></div>
   <nav>
     <button data-tab="escanear" class="on">Escanear</button>
-    <button data-tab="movimientos" id="nav-mov" class="hidden">Movimientos<span class="badge" id="nav-mov-n"></span></button>
+    <button data-tab="descargas">Descargas</button>
     <button data-tab="informe">Informe</button>
     <button data-tab="pickings" id="nav-pick" class="hidden">Pickings</button>
     <button data-tab="libres">Libres</button>
@@ -257,20 +278,22 @@ mark { background: #fde047; color: #14212b; border-radius: 2px; }
     </div>
   </section>
 
-  <!-- MOVIMIENTOS (solo responsable) -->
-  <section class="tab" id="tab-movimientos">
-    <div class="tiles" id="mov-tiles"></div>
-    <p class="muted" id="mov-estado"></p>
-    <div id="mov-otros"></div>
-    <div class="card">
-      <label class="f" for="mov-buscar" style="margin-top:0">Buscar artículo: ¿adónde se ha llevado?</label>
-      <input type="search" id="mov-buscar" placeholder="Código o nombre del artículo" autocomplete="off">
-      <div id="mov-resumen"></div>
+  <!-- DESCARGAS: el listado de pedidos con el picking de cada artículo -->
+  <section class="tab" id="tab-descargas">
+    <div class="card noprint">
+      <h2>Descargas del día</h2>
+      <p class="muted">Carga el PDF del <b>Listado pedidos de compras</b> y te digo en qué picking va cada artículo, separado por proveedor y con los mismos datos del listado. Después lo puedes imprimir.</p>
+      <label class="btn primary big" for="in-pedidos">📄 Cargar listado de pedidos (PDF)</label>
+      <input type="file" id="in-pedidos" accept="application/pdf,.pdf" class="hidden">
+      <div id="ped-estado" class="status hidden"></div>
+      <div class="row hidden" id="ped-acciones" style="margin-top:10px">
+        <button class="btn small primary" id="btn-ped-imprimir">🖨️ Imprimir</button>
+        <button class="btn small" id="btn-ped-excel">⬇️ Excel</button>
+        <button class="btn small" id="btn-ped-quitar">Quitar el listado</button>
+      </div>
     </div>
-    <div class="card"><h2>Movimientos por hacer</h2><p class="muted">Toca un dato para copiarlo. Los más antiguos, primero.</p><div id="mov-porhacer"></div></div>
-    <div class="card"><h2>Movimientos hechos</h2>
-      <div class="row" style="margin-bottom:6px"><button class="btn small" id="btn-export-feed">⬇️ Exportar todos a Excel</button></div>
-      <div id="mov-hechos"></div></div>
+    <div class="tiles noprint" id="ped-tiles"></div>
+    <div id="ped-doc"></div>
   </section>
 
   <!-- INFORME -->
@@ -284,11 +307,11 @@ mark { background: #fde047; color: #14212b; border-radius: 2px; }
         <button class="btn small" id="btn-export-mov">⬇️ Exportar movimientos a Excel</button>
       </div>
     </div>
-    <div class="card"><h2>Movimientos anotados</h2><p class="muted">Lo que se ha movido, con las cajas que has indicado.</p>
-      <div class="row" style="margin-bottom:6px"><button class="btn small" id="btn-export-hechos">⬇️ Exportar anotados</button><button class="btn small" id="btn-borrar-hechos">Borrar todos</button></div>
-      <div id="inf-hechos"></div></div>
     <div class="card"><h2>Movimientos a hacer</h2><p class="muted">Cajas en un picking que no es el suyo y adónde deben ir.</p><div id="inf-mov"></div></div>
     <div class="card"><h2>Pickings con problemas</h2><p class="muted">Ubicaciones de picking con varios artículos o con un artículo que no les corresponde.</p><div id="inf-mezcla"></div></div>
+    <div class="card"><h2>Stock caducado (505)</h2><p class="muted">UA con situación 505 en el Excel de stock.</p>
+      <div class="row" style="margin-bottom:6px"><button class="btn small" id="btn-export-cad">⬇️ Exportar caducados a Excel</button></div>
+      <div id="inf-cad"></div></div>
     <div class="card"><h2>Pickings sin su artículo</h2><p class="muted">Pickings asignados donde no hay stock de su artículo, y dónde hay palets para reponer.</p><div id="inf-vacios"></div></div>
   </section>
 
@@ -368,11 +391,13 @@ mark { background: #fde047; color: #14212b; border-radius: 2px; }
       <button class="btn small" id="btn-cambiar-almacen">Cambiar de almacén</button>
       <p class="muted">Todo lo que sea de otro almacén se ignora en los Excel. Al escribir tu ubicación puedes omitir el almacén: «01-004-01-1» se completa con el almacén en el que estás.</p>
       <p class="muted">Formato reconocido: <b>AA-FF-HHH-NN-1</b> (almacén-fila-hueco-nivel), con o sin guiones. El 1 final es fijo en todas las ubicaciones y no significa nada.</p>
-      <p class="muted">Los niveles 1 y 2 son picking y del 3 en adelante, reserva. Si el Excel de ubicaciones vacías indica otro tipo, manda ese (por ejemplo, algunos terceros de Barcelona son picking).</p>
+      <p class="muted">Los niveles 1 y 2 son picking y del 3 en adelante, reserva. Si el Excel de ubicaciones vacías indica otro tipo, manda ese (por ejemplo, algunos terceros de Barcelona son picking). La playa (en Barcelona, las ubicaciones que empiezan por 013, 014 y 017) es siempre reserva, desde el suelo hasta el nivel 06.</p>
       <label class="f" for="aj-digitos">Solo para otros formatos: cuántos dígitos finales indican el nivel</label>
       <input type="number" id="aj-digitos" min="1" max="3">
       <label class="f" for="aj-niveles">Niveles de picking (separados por coma)</label>
       <input type="text" id="aj-niveles">
+      <label class="f" for="aj-playa">Playa: ubicaciones que empiezan por… (siempre reserva, todos los niveles)</label>
+      <input type="text" id="aj-playa" placeholder="013, 014, 017" autocomplete="off">
       <p class="muted" id="aj-ejemplo"></p>
     </div>
     <div class="card">
@@ -465,10 +490,10 @@ const store = (() => {
 // ---------- definición de los Excel ----------
 const TIPOS = {
   stock: {
-    titulo: "Stock almacén", desc: "Artículo, descriptivo, lote, caducidad, cajas, peso, UA, situación, entrada, ubicación",
+    titulo: "Stock almacén", desc: "Artículo, descriptivo, lote, caducidad, cajas, peso, UA, situación (505 = caducado), entrada, ubicación",
     campos: [
       ["articulo", "Nº artículo", true], ["descripcion", "Descriptivo", true], ["lote", "Lote"], ["caducidad", "Fecha caducidad"],
-      ["cajas", "Cajas / unidades"], ["peso", "Peso (kg)"], ["ua", "Nº UA"], ["situacion", "Situación"], ["entrada", "Nº entrada"], ["ubicacion", "Ubicación", true],
+      ["cajas", "Cajas / unidades"], ["peso", "Peso (kg)"], ["ua", "Nº UA"], ["situacion", "Situación"], ["sitDesc", "Descripción situación / Caducado"], ["entrada", "Nº entrada"], ["ubicacion", "Ubicación", true],
     ],
   },
   maestro: {
@@ -489,6 +514,7 @@ const CLAVES = {
   peso: ["peso", "kilos", "kgs", "kg"], // con las cajas da el kg por caja de cada artículo (traspasos por bases)
   ua: ["ua", "sscc", "contenedor", "matricula", "palet", "pallet", "hu"],
   situacion: ["situacion", "estado", "status", "sit"],
+  sitDesc: ["descripcion situacion", "desc situacion", "texto situacion", "caducado"],
   entrada: ["entrada", "recepcion", "albaran"],
   ubicacion: ["nombre ubicacion", "ubicacion", "ubic", "posicion", "location", "hueco"],
   tipo: ["descripcion tipo ubicacion", "tipo ubicacion", "tipo ubic"],
@@ -499,7 +525,10 @@ function puntuarCabecera(campo, cabecera) {
   const toks = h.split(" ");
   if (campo === "articulo" && /descrip|nombre|denomin|texto/.test(h)) return 0;
   // "Nombre ubicación", "Descripción tipo ubicación", "Descripción zona"… no son el descriptivo del artículo
-  if (campo === "descripcion" && /ubic|zona|area|tipo|almacen/.test(h)) return 0;
+  if (campo === "descripcion" && /ubic|zona|area|tipo|almacen|situacion/.test(h)) return 0;
+  // «Caducado» es la situación del palet, no su fecha de caducidad
+  if (campo === "caducidad" && /caducado/.test(h)) return 0;
+  if (campo === "situacion" && /descrip|texto|caducado/.test(h)) return 0;
   if (campo === "ubicacion" && /tipo|zona|area/.test(h)) return 0;
   const lista = CLAVES[campo] || [];
   for (let i = 0; i < lista.length; i++) {
@@ -541,13 +570,15 @@ function filaCabecera(filas) {
 
 // ---------- estado ----------
 let S = {
-  stock: null, maestro: null, vacias: null, maestroManual: [], alias: {}, mapeos: {}, tiposUbi: {}, hechos: [], pickHechos: {},
+  stock: null, maestro: null, vacias: null, maestroManual: [], alias: {}, mapeos: {}, tiposUbi: {}, pickHechos: {},
   ajustes: { digitos: 1, niveles: "1,2", codigo: "", tema: "", zona: "08", responsable: false }, uso: {},
-  colaEv: [], feed: { cursor: "", movs: {} }, baseVer: {}, basePend: [],
+  colaEv: [], baseVer: {}, basePend: [],
 };
 let IDX = null;
 
 async function cargarEstado() {
+  // la pestaña Movimientos ya no existe: lo que tuviera guardado este dispositivo se borra
+  for (const k of ["hechos", "feed"]) store.del(k);
   for (const k of Object.keys(S)) { if (POR_ALMACEN.includes(k)) continue; const v = await store.get(k); if (v !== undefined) S[k] = v; }
   S.ajustes = Object.assign({ digitos: 1, niveles: "1,2", codigo: "", tema: "", zona: "08", responsable: false }, S.ajustes);
   // Lo cargado antes de separar por almacén pasa al almacén que tenía elegido este dispositivo
@@ -603,7 +634,12 @@ function tipoEsPicking(t) {
   if (/reserva|muelle|dock|transit/.test(s)) return false;
   return null; // un valor que no se reconoce no dice nada: se decide por el nivel
 }
-const esPicking = (u) => TIPO_UBI.get(normUbi(u)) ?? nivelesPicking().has(nivelDe(u));
+// Playa: ubicaciones que no están en ningún pasillo y solo sirven para guardar género (en Barcelona, las que
+// empiezan por 013, 014 y 017). Siempre son reserva, de suelo a altura, diga lo que diga el tipo del sistema.
+const PLAYA_DEF = "013, 014, 017";
+const prefijosPlaya = () => String(S.ajustes.playa ?? PLAYA_DEF).split(/[^0-9A-Za-z]+/).map(normUbi).filter(Boolean);
+const esPlaya = (u) => { const c = normUbi(u); return !!c && prefijosPlaya().some((p) => c.startsWith(p)); };
+const esPicking = (u) => !esPlaya(u) && (TIPO_UBI.get(normUbi(u)) ?? nivelesPicking().has(nivelDe(u)));
 // Solo se trabaja con el almacén elegido (S.ajustes.zona); el resto de almacenes de los Excel se ignora.
 const enZona = (u) => { const z = normUbi(S.ajustes.zona); return !z || normUbi(u).startsWith(z); };
 // Si el operario escribe la ubicación sin la zona (01-004-01-1 o 01004011), se le añade
@@ -616,6 +652,9 @@ function completarUbi(txt) {
   return txt;
 }
 const disponible = (f) => { const s = String(f.situacion ?? "").trim(); return !s || s === "100"; };
+// Situación 505 = caducado. Si el Excel trae además una columna con el texto de la situación (o una «Caducado»), también cuenta.
+const caducado = (f) => { const s = String(f.situacion ?? "").trim(), d = String(f.sitDesc ?? "").trim();
+  return /^505(\D|$)/.test(s) || /caduc/i.test(s) || /505|caduc|^(si|sí|x|1|true)$/i.test(d); };
 
 function construirIndice() {
   TIPO_UBI = new Map(Object.entries(S.tiposUbi || {}).filter(([u]) => enZona(u))); // tipos recordados de cargas anteriores
@@ -626,7 +665,8 @@ function construirIndice() {
   }
   const articulos = new Map(); // art -> {articulo, descripcion, filas[]}
   const stockPorUbi = new Map(); // ubi -> filas[]
-  const asignadoPorUbi = new Map(); // ubi -> art
+  const asignadoPorUbi = new Map(); // ubi -> art (solo el último del maestro)
+  const asignadosDeUbi = new Map(); // ubi -> Set(art): todos los que el maestro asigna a ese picking
   const pickingDeArt = new Map(); // art -> [ubi originales]
   const ubiOriginal = new Map(); // ubi normalizada -> texto original
   const vacias = new Set();
@@ -653,6 +693,8 @@ function construirIndice() {
     const u = normUbi(m.ubicacion);
     if (!u || !esPicking(m.ubicacion)) continue; // solo se envía a picking, nunca a niveles de almacenaje
     asignadoPorUbi.set(u, a.k);
+    if (!asignadosDeUbi.has(u)) asignadosDeUbi.set(u, new Set());
+    asignadosDeUbi.get(u).add(a.k);
     if (!pickingDeArt.has(a.k)) pickingDeArt.set(a.k, []);
     if (!pickingDeArt.get(a.k).some((x) => normUbi(x) === u)) pickingDeArt.get(a.k).push(String(m.ubicacion).trim());
     ubiOriginal.set(u, String(m.ubicacion).trim());
@@ -663,7 +705,7 @@ function construirIndice() {
     a.lotes = [...new Set(a.filas.map((f) => f.loteN).filter(Boolean))];
     a.cads = [...new Set(a.filas.map((f) => f.cad).filter(Boolean))];
   }
-  IDX = { articulos, stockPorUbi, asignadoPorUbi, pickingDeArt, ubiOriginal, vacias, hayMaestro: maestro.length > 0 };
+  IDX = { articulos, stockPorUbi, asignadoPorUbi, asignadosDeUbi, pickingDeArt, ubiOriginal, vacias, hayMaestro: maestro.length > 0 };
 }
 const verUbi = (u) => IDX.ubiOriginal.get(normUbi(u)) || u;
 
@@ -873,8 +915,46 @@ async function procesarFoto(file) {
 function filasTabla(filas, uActual) {
   if (!filas.length) return `<p class="muted">Sin stock registrado.</p>`;
   return `<div class="scroll"><table class="tbl"><tr><th>Ubicación</th><th>UA</th><th>Lote</th><th>Cad.</th><th>Cajas</th><th>Sit.</th></tr>${filas
-    .map((f) => `<tr class="${uActual && f.u === uActual ? "here" : ""}"><td>${esc(f.ubicacion)}</td><td class="mono">${esc(f.ua)}</td><td>${esc(f.lote)}</td><td>${esc(verFecha(f.cad))}</td><td>${esc(f.cajas)}</td><td>${esc(f.situacion)}</td></tr>`)
+    .map((f) => `<tr class="${uActual && f.u === uActual ? "here" : ""}"><td>${esc(f.ubicacion)}</td><td class="mono">${esc(f.ua)}</td><td>${esc(f.lote)}</td><td>${esc(verFecha(f.cad))}</td><td>${esc(f.cajas)}</td><td>${caducado(f) ? `<span class="badge bad">${esc(f.situacion || "505")} caducado</span>` : esc(f.situacion)}</td></tr>`)
     .join("")}</table></div>`;
+}
+
+// Cuántas cajas hay del artículo, en picking y en reserva, y en qué ubicaciones
+const cajasDe = (f) => (f.cajas === "" || f.cajas == null ? 0 : cantidad(f.cajas));
+const nCajas = (n) => `${fmtCant(n)} ${n === 1 ? "caja" : "cajas"}`;
+function resumenStock(a, pk, uActual) {
+  if (!a.filas.length) return `<div class="card stk"><h2>Stock</h2><p class="muted" style="margin:0">No hay stock de este artículo en el Excel cargado.</p></div>`;
+  const suyos = new Set(pk.map(normUbi));
+  const porU = new Map();
+  for (const f of a.filas) {
+    if (!porU.has(f.u)) porU.set(f.u, { u: f.u, ubi: f.ubicacion, picking: esPicking(f.ubicacion), playa: esPlaya(f.ubicacion), cajas: 0, cad505: 0, uas: 0, lotes: new Set(), cads: [], otras: new Set() });
+    const g = porU.get(f.u), c = cajasDe(f);
+    g.cajas += c; g.uas++;
+    if (f.lote) g.lotes.add(f.lote);
+    if (f.cad) g.cads.push(f.cad);
+    if (caducado(f)) g.cad505 += c;
+    else if (!disponible(f)) g.otras.add(f.situacion);
+  }
+  const grupos = [...porU.values()].sort((x, y) => (suyos.has(y.u) - suyos.has(x.u)) || (y.picking - x.picking) || x.u.localeCompare(y.u));
+  const suma = (l) => l.reduce((n, g) => n + g.cajas, 0);
+  const enPick = grupos.filter((g) => g.picking), enRes = grupos.filter((g) => !g.picking);
+  const cad = grupos.reduce((n, g) => n + g.cad505, 0);
+  const tile = (n, txt, ubis, cls = "") => `<div class="tile ${cls}"><b>${fmtCant(n)}</b><span>${txt}${ubis != null ? ` · ${ubis} ${ubis === 1 ? "ubicación" : "ubicaciones"}` : ""}</span></div>`;
+  const fila = (g) => {
+    const tipo = g.picking ? (suyos.has(g.u) ? "Su picking" : "Picking") : g.playa ? "Playa" : "Reserva";
+    const cadMin = g.cads.sort()[0];
+    return `<li class="stk-u${uActual && g.u === uActual ? " aqui" : ""}${g.cad505 ? " cad" : ""}">
+      <div class="stk-cab"><span class="stk-ubi">${esc(g.ubi)}</span><span class="badge ${g.picking ? "ok" : ""}">${tipo}</span>${uActual && g.u === uActual ? ' <span class="badge">Estás aquí</span>' : ""}<b class="stk-cj">${fmtCant(g.cajas)} cj</b></div>
+      <div class="muted">${g.uas} UA${g.lotes.size ? ` · lote ${[...g.lotes].slice(0, 3).map(esc).join(", ")}${g.lotes.size > 3 ? "…" : ""}` : ""}${cadMin ? ` · cad. ${esc(verFecha(cadMin))}` : ""}</div>
+      ${g.cad505 ? `<div class="stk-aviso">⛔ ${fmtCant(g.cad505)} cj caducado (situación 505)</div>` : ""}
+      ${g.otras.size ? `<div class="muted">Situación ${[...g.otras].map(esc).join(", ")}</div>` : ""}</li>`;
+  };
+  return `<div class="card stk">
+    <h2>Stock: ${nCajas(suma(grupos))}</h2>
+    ${cad ? `<div class="verdict bad" style="font-size:15px;margin-top:0">⛔ Hay ${nCajas(cad)} ${cad === 1 ? "caducada" : "caducadas"} (situación 505)</div>` : ""}
+    <div class="tiles" style="margin-bottom:8px">${tile(suma(enPick), "cajas en picking", enPick.length)}${tile(suma(enRes), "cajas en reserva", enRes.length)}${cad ? tile(cad, "cajas caducadas (505)", null, "bad") : ""}</div>
+    <ul class="list">${grupos.map(fila).join("")}</ul>
+  </div>`;
 }
 
 let ULTIMO = null;
@@ -908,23 +988,12 @@ function mostrarResultado(r) {
   if (r.filaUA) filas = [r.filaUA, ...filas.filter((f) => f !== r.filaUA)];
 
   const veredicto = bloqueDestino(pk, uTxt, uActual);
-  const yaAqui = uActual && pk.some((p) => normUbi(p) === uActual);
-  const uasAqui = uActual ? a.filas.filter((f) => f.u === uActual) : [];
-  const anotar = pk.length && !yaAqui ? `<div class="card anotar">
-    <h2>Anotar movimiento</h2>
-    <label class="f" for="an-cajas">Cajas que mueves</label>
-    <div class="stepper"><button class="btn" data-paso="-1" aria-label="Una caja menos">−</button><input type="number" id="an-cajas" inputmode="numeric" pattern="[0-9]*" min="1" placeholder="0"><button class="btn" data-paso="1" aria-label="Una caja más">+</button></div>
-    ${pk.length > 1 ? `<label class="f" for="an-destino">Destino</label><select id="an-destino">${pk.map((p) => `<option>${esc(p)}</option>`).join("")}</select>` : ""}
-    ${uasAqui.length ? `<label class="f" for="an-ua">UA</label><select id="an-ua">${uasAqui.map((f) => `<option value="${esc(f.ua)}">${esc(f.ua)} · lote ${esc(f.lote)} · ${esc(f.cajas)} cajas</option>`).join("")}<option value="">Otra / sin UA</option></select>` : ""}
-    <button class="btn primary big" id="an-ok" style="margin-top:12px">✔ Anotar movimiento</button>
-  </div>` : "";
-
   const enUbi = uActual ? IDX.stockPorUbi.get(uActual) || [] : [];
   const otrosEnUbi = [...new Set(enUbi.filter((f) => f.k !== r.k).map((f) => f.k))];
   const puedeAsignar = uActual && !pk.length && !IDX.asignadoPorUbi.get(uActual) && esPicking(uTxt);
   const conf = { alta: "ok", media: "warn", baja: "bad" }[r.confianza] || "";
 
-  cont.innerHTML = `${veredicto}${anotar}<div class="card">
+  cont.innerHTML = `${veredicto}${resumenStock(a, pk, uActual)}<div class="card">
     <div class="row" style="justify-content:space-between"><div><span class="badge ${conf}">Confianza ${esc(r.confianza)}</span> <span class="muted">${esc(r.fuente)}</span></div></div>
     <h2 style="margin-top:10px">${esc(a.articulo)} · ${esc(a.descripcion)}</h2>
     <p class="muted">${esc(r.motivo || "")}</p>
@@ -935,32 +1004,10 @@ function mostrarResultado(r) {
     </div>
     ${leido ? `<details><summary>Leído en la etiqueta</summary><p>${leido}</p></details>` : ""}
     ${delLote.length ? `<h3>UA con este lote</h3>${filasTabla(delLote, uActual)}` : ""}
-    <h3>Todo el stock de este artículo (${a.filas.length})</h3>${filasTabla(filas, uActual)}
+    ${a.filas.length ? `<details><summary>Ver cada UA (${a.filas.length})</summary>${filasTabla(filas, uActual)}</details>` : ""}
     ${listaOtros}
   </div>`;
 
-  cont.querySelectorAll("[data-paso]").forEach((b) => b.addEventListener("click", () => {
-    const i = $("#an-cajas");
-    i.value = Math.max(0, (parseInt(i.value, 10) || 0) + +b.dataset.paso) || "";
-  }));
-  $("#an-ok")?.addEventListener("click", async () => {
-    const cajas = parseInt($("#an-cajas").value, 10);
-    if (!(cajas > 0)) { toast("Indica cuántas cajas mueves"); $("#an-cajas").focus(); return; }
-    const hacia = $("#an-destino")?.value || pk[0];
-    const ua = $("#an-ua")?.value || "";
-    const fila = ua ? a.filas.find((f) => f.ua === ua) : null;
-    // si la etiqueta no trae la caducidad, se coge la de su lote en el stock
-    const mov = { id: Date.now() + "-" + Math.random().toString(36).slice(2, 6), fecha: Date.now(), articulo: a.articulo, descripcion: a.descripcion,
-      desde: uTxt, hacia, cajas, ua, lote: fila?.lote || lect.lote || "", caducidad: fila?.cad || normFecha(lect.caducidad) || delLote[0]?.cad || "" };
-    S.hechos.push({ ...mov, k: a.k, compartido: true, cod: S.ajustes.codigo });
-    await guardar("hechos");
-    await encolar({ tipo: "alta", id: mov.id, mov });
-    pintarInforme();
-    limpiarEscaneo();
-    toast(`Anotado: ${cajas} cajas → ${hacia}`);
-    await enviarCola();
-    if (ERROR_ENVIO) toast(`Guardado en el móvil, se enviará solo. ${ERROR_ENVIO}`);
-  });
   $("#btn-ok")?.addEventListener("click", () => { aprenderAlias(r.lectura, r.k); toast("Guardado: la próxima vez lo reconoce al momento"); });
   $("#btn-asignar")?.addEventListener("click", async () => {
     const asignacion = { articulo: a.articulo, ubicacion: uTxt, descripcion: a.descripcion };
@@ -981,7 +1028,7 @@ function mostrarResultado(r) {
   cont.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 const ALMACENES = { "08": "Garcimar Madrid", "01": "Garcimar Barcelona", "02": "Garcimar Málaga" };
-// Tras anotar se quita todo, para que la siguiente caja no se confunda con la foto anterior
+// Al cambiar de almacén se quita todo, para que no se confunda con la foto anterior
 function limpiarEscaneo() {
   ULTIMO = null;
   $("#resultado").innerHTML = "";
@@ -1054,18 +1101,22 @@ function buscar(q) {
 }
 
 // ---------- informe ----------
-let MOVS = [];
+let MOVS = [], CADUCADOS = [];
 function calcularInforme() {
-  const mov = [], mezcla = [], vacios = [];
+  const mov = [], mezcla = [], vacios = [], caducados = [];
+  for (const filas of IDX.stockPorUbi.values()) for (const f of filas) if (caducado(f)) caducados.push(f);
   for (const [u, filas] of IDX.stockPorUbi) {
     if (!esPicking(verUbi(u))) continue;
     const arts = [...new Set(filas.map((f) => f.k))];
+    // un picking puede estar asignado a varios artículos: ninguno de ellos es un intruso aquí
+    const asignados = IDX.asignadosDeUbi.get(u);
     const asign = IDX.asignadoPorUbi.get(u);
-    const intrusos = asign ? arts.filter((k) => k !== asign) : (IDX.hayMaestro ? arts.filter((k) => (IDX.pickingDeArt.get(k) || []).length) : []);
+    const intrusos = asignados ? arts.filter((k) => !asignados.has(k)) : (IDX.hayMaestro ? arts.filter((k) => (IDX.pickingDeArt.get(k) || []).length) : []);
     if (arts.length > 1 || intrusos.length) mezcla.push({ u, arts, asign, intrusos });
     for (const f of filas) {
       if (!intrusos.includes(f.k)) continue;
-      const destinos = IDX.pickingDeArt.get(f.k) || [];
+      // nunca se manda al mismo picking del que sale
+      const destinos = (IDX.pickingDeArt.get(f.k) || []).filter((d) => normUbi(d) !== u);
       let estadoDest = "Sin picking asignado";
       if (destinos.length) {
         const ud = normUbi(destinos[0]);
@@ -1077,9 +1128,9 @@ function calcularInforme() {
       mov.push({ f, desde: verUbi(u), destino: destinos.join(" / ") || "¿?", estadoDest });
     }
   }
-  for (const [u, k] of IDX.asignadoPorUbi) {
+  for (const [u, asignados] of IDX.asignadosDeUbi) for (const k of asignados) {
     const filas = IDX.stockPorUbi.get(u) || [];
-    if (filas.some((f) => f.k === k)) continue;
+    if (filas.some((f) => asignados.has(f.k))) continue; // tiene alguno de sus artículos
     const a = IDX.articulos.get(k);
     // primero los palets disponibles, y dentro de ellos la caducidad más cercana
     const reserva = (a?.filas || []).filter((f) => !esPicking(f.ubicacion))
@@ -1089,48 +1140,13 @@ function calcularInforme() {
   mov.sort((x, y) => normUbi(x.desde).localeCompare(normUbi(y.desde)));
   mezcla.sort((x, y) => x.u.localeCompare(y.u));
   vacios.sort((x, y) => x.u.localeCompare(y.u));
-  return { mov, mezcla, vacios };
+  caducados.sort((x, y) => x.u.localeCompare(y.u) || x.k.localeCompare(y.k));
+  return { mov, mezcla, vacios, caducados };
 }
 const nomArt = (k) => { const a = IDX.articulos.get(k); return a ? `${a.articulo} ${a.descripcion}` : k; };
 const LIM = 300;
-// Un movimiento pendiente se da por hecho si se ha anotado su UA, o el artículo desde esa misma ubicación
-function hechoDe(m) {
-  return (S.hechos || []).find((h) => (h.ua && normDigitos(h.ua) === m.f.uaN) || (!h.ua && h.k === m.f.k && normUbi(h.desde) === normUbi(m.desde)));
-}
-const hechosAlmacen = () => (S.hechos || []).filter((h) => enZona(h.hacia));
-function pintarHechos() {
-  const hechos = hechosAlmacen();
-  const hora = (t) => new Date(t).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-  const enCola = new Set(S.colaEv.filter((e) => e.tipo === "alta").map((e) => e.id));
-  const envio = (h) => !h.compartido ? "" : enCola.has(h.id) ? `<span class="badge warn">⏳ Pendiente de enviar</span>` : `<span class="badge ok">✔ Enviado</span>`;
-  $("#inf-hechos").innerHTML = hechos.length ? `<p class="muted">${hechos.length} movimientos · ${hechos.reduce((n, h) => n + h.cajas, 0)} cajas</p><ul class="list">${[...hechos].reverse().slice(0, LIM).map((h) => `<li class="cand">
-      <div><div>${h.desde ? `<b>${esc(h.desde)}</b> ` : ""}→ <b>${esc(h.hacia)}</b> · <b>${esc(h.cajas)} cajas</b> ${envio(h)}</div>
-      <div>${esc(h.articulo)} · ${esc(h.descripcion)}</div>
-      <div class="muted mono">${h.ua ? `UA ${esc(h.ua)} · ` : ""}${hora(h.fecha)}</div></div>
-      <button class="btn small" data-borrar-hecho="${esc(h.id)}" aria-label="Borrar">✕</button></li>`).join("")}</ul>` : `<p class="muted">Todavía no hay movimientos anotados. Se anotan desde Escanear.</p>`;
-  $("#inf-hechos").querySelectorAll("[data-borrar-hecho]").forEach((b) => b.addEventListener("click", async () => {
-    if (!confirm("¿Borrar este movimiento anotado?")) return;
-    await quitarHechos(S.hechos.filter((h) => h.id === b.dataset.borrarHecho));
-    pintarInforme();
-  }));
-}
-// Borrar un movimiento ya compartido también avisa al responsable.
-// Lo anotado con otro código no se puede borrar desde aquí: se queda en la lista para que no parezca borrado.
-async function quitarHechos(lista) {
-  const deOtro = (h) => h.compartido && h.cod && h.cod !== S.ajustes.codigo && !S.ajustes.responsable;
-  const bloqueados = lista.filter(deOtro);
-  const ids = new Set(lista.filter((h) => !deOtro(h)).map((h) => h.id));
-  S.hechos = S.hechos.filter((h) => !ids.has(h.id));
-  await guardar("hechos");
-  for (const h of lista) if (h.compartido && ids.has(h.id)) await encolar({ tipo: "borrar", id: h.id });
-  enviarCola();
-  if (bloqueados.length) toast(`${bloqueados.length === 1 ? "1 movimiento se anotó" : `${bloqueados.length} movimientos se anotaron`} con otro código: se borran desde Movimientos.`);
-  return bloqueados.length;
-}
-
-// ---------- movimientos compartidos ----------
-// Todo lo que cambia (alta, hecho, deshacer, borrar) se guarda en una cola del móvil y se envía desde ahí,
-// así un movimiento anotado sin cobertura no se pierde y sale solo al volver la señal.
+// ---------- servidor ----------
+// La pestaña Movimientos ya no existe. Si a un móvil le quedaba algo anotado sin enviar, se envía igualmente.
 let ERROR_ENVIO = "", enviando = false, timerEnvio = null;
 async function apiMov(body, ruta = "/api/movimientos") {
   const r = await fetch(ruta, {
@@ -1142,10 +1158,6 @@ async function apiMov(body, ruta = "/api/movimientos") {
   try { j = await r.json(); } catch {}
   if (!r.ok) throw Object.assign(new Error(j?.error || `Error ${r.status}`), { status: r.status });
   return j;
-}
-async function encolar(ev) {
-  S.colaEv.push({ ...ev, ev: Date.now() + "-" + Math.random().toString(36).slice(2, 8) });
-  await guardar("colaEv");
 }
 async function enviarCola() {
   if (enviando || !S.colaEv.length) return;
@@ -1166,119 +1178,17 @@ async function enviarCola() {
     if (e.status !== 401) timerEnvio = setTimeout(enviarCola, 30000);
   } finally {
     enviando = false;
-    pintarHechos();
   }
-}
-function aplicarEvento(e) {
-  const movs = S.feed.movs;
-  if (e.tipo === "alta") {
-    if (movs[e.id]) return false; // repetido
-    movs[e.id] = { ...e.mov, id: e.id, movil: e.movil, llegada: e.en, estado: "porhacer" };
-    return true;
-  }
-  const m = movs[e.id];
-  if (!m) return false;
-  const antes = JSON.stringify(m);
-  if (e.tipo === "hecho") { m.estado = "hecho"; m.hechoEn = e.en; }
-  else if (e.tipo === "deshacer") { m.estado = "porhacer"; delete m.hechoEn; }
-  else if (e.tipo === "borrar") {
-    if (e.responsable) m.eliminado = true; // lo borra el responsable: desaparece para todos
-    else if (e.movil === m.movil) m.anulado = true;
-  }
-  return JSON.stringify(m) !== antes;
 }
 // El sistema del almacén solo reconoce la ubicación con 99 delante y sin guiones
 const codigoSistema = (u) => { const n = normUbi(u); return !n || /^99\d{10}$/.test(n) ? n : "99" + n; };
-const chipCopia = (etq, valor, clase = "") => {
-  const v = String(valor ?? "").trim();
-  return v ? `<button class="copia ${clase}" data-copiar="${esc(v)}"><span>${etq}</span><b>${esc(v)}</b></button>` : `<div class="copia ${clase}"><span>${etq}</span><b>—</b></div>`;
-};
-function tarjetaMov(m) {
-  const hora = new Date(m.fecha).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-  const accion = m.anulado ? "" : m.estado === "hecho"
-    ? `<button class="btn small" data-deshacer="${esc(m.id)}">↩ Deshacer</button>`
-    : `<button class="btn small primary" data-hecho="${esc(m.id)}">✔ Hecho</button>`;
-  return `<div class="mov">
-    ${m.anulado ? `<div class="verdict bad" style="font-size:15px;margin-top:0">⚠️ El operario lo ha borrado. Revísalo en el sistema si ya lo registraste.</div>` : ""}
-    <div class="copias">${chipCopia("Artículo", m.articulo)}${chipCopia("Cajas", m.cajas)}${chipCopia("Lote", m.lote)}${chipCopia("Caducidad", verFecha(m.caducidad))}${chipCopia("A su picking", codigoSistema(m.hacia), "destacada")}</div>
-    <div class="mov-nom" style="margin:8px 0 0">${esc(m.descripcion)}</div>
-    ${m.desde ? `<div class="muted">Desde ${esc(m.desde)}</div>` : ""}
-    <div class="mov-pie"><span class="muted">${esc(m.movil)} · ${hora}</span><div class="row" style="flex:0 0 auto;flex-wrap:nowrap">${accion}<button class="btn small" data-borrar="${esc(m.id)}" aria-label="Borrar">✕</button></div></div>
-  </div>`;
-}
-function pintarMovimientos() {
-  const sinBorrar = Object.values(S.feed.movs).filter((m) => !m.eliminado);
-  const todos = sinBorrar.filter((m) => enZona(m.hacia));
-  // lo pendiente en otros almacenes se avisa, para que no se quede sin ver
-  const otros = new Map();
-  for (const m of sinBorrar) {
-    if (enZona(m.hacia) || m.estado === "hecho" || m.anulado) continue;
-    const z = normUbi(m.hacia).slice(0, 2);
-    otros.set(z, (otros.get(z) || 0) + 1);
-  }
-  $("#mov-otros").innerHTML = [...otros].map(([z, n]) => `<p class="muted">⚠️ ${n} por hacer en ${esc(nombreAlmacen(z))}</p>`).join("");
-  const porHacerTodos = todos.filter((m) => m.estado !== "hecho" && !m.anulado).sort((a, b) => a.llegada - b.llegada);
-  const hechosTodos = todos.filter((m) => m.estado === "hecho").sort((a, b) => b.hechoEn - a.hechoEn);
-  const q = $("#mov-buscar").value.trim();
-  const qN = norm(q);
-  const pasa = (m) => !qN || normArt(m.articulo) === normArt(q) || norm(`${m.articulo} ${m.descripcion}`).includes(qN);
-  const porHacer = porHacerTodos.filter(pasa), hechos = hechosTodos.filter(pasa);
-  $("#nav-mov-n").textContent = porHacerTodos.length || "";
-  $("#mov-tiles").innerHTML = [[porHacerTodos.length, "por hacer"], [hechosTodos.length, "hechos"]].map(([n, t]) => `<div class="tile"><b>${n}</b><span>${t}</span></div>`).join("");
-  // resumen de la búsqueda: cuántas cajas han ido a cada picking
-  const destinos = new Map();
-  for (const m of [...porHacer, ...hechos]) {
-    if (m.anulado) continue;
-    const c = codigoSistema(m.hacia);
-    const d = destinos.get(c) || { cajas: 0, movs: 0 };
-    d.cajas += m.cajas; d.movs++;
-    destinos.set(c, d);
-  }
-  $("#mov-resumen").innerHTML = !qN ? "" : destinos.size
-    ? `<h3>Llevado a</h3><ul class="list">${[...destinos].map(([c, d]) => `<li class="cand"><button class="copia destacada" data-copiar="${esc(c)}"><span>Picking</span><b>${esc(c)}</b></button><span class="s">${d.cajas} cajas · ${d.movs} mov.</span></li>`).join("")}</ul>`
-    : `<p class="muted">Ningún movimiento de ese artículo.</p>`;
-  const vacio = (txt) => `<p class="muted">${qN ? "Ninguno con ese artículo." : txt}</p>`;
-  $("#mov-porhacer").innerHTML = porHacer.map(tarjetaMov).join("") || vacio("No hay movimientos por hacer 👍");
-  $("#mov-hechos").innerHTML = hechos.slice(0, LIM).map(tarjetaMov).join("") + (hechos.length > LIM ? `<p class="muted">Mostrando ${LIM} de ${hechos.length}. Exporta a Excel para verlos todos.</p>` : "") || vacio("Todavía no hay ninguno.");
-}
-function estadoMov(txt) { $("#mov-estado").textContent = txt; }
-let consultando = false, timerMov = null;
-const movVisible = () => S.ajustes.responsable && $("#tab-movimientos").classList.contains("on") && document.visibilityState === "visible";
-async function consultarMov() {
-  if (consultando || !S.ajustes.responsable) return;
-  consultando = true;
-  try {
-    await enviarCola();
-    if (S.colaEv.length) { estadoMov(`🔴 ${ERROR_ENVIO || "Enviando cambios…"} Reintentando…`); return; }
-    let cambios = false, exacto = false, vueltas = 0, r;
-    do {
-      r = await apiMov({ accion: "novedades", desde: S.feed.cursor, exacto });
-      for (const e of r.eventos) if (aplicarEvento(e)) cambios = true;
-      S.feed.cursor = r.cursor;
-      exacto = true; // las páginas siguientes siguen justo donde acabó la anterior
-    } while (r.mas && ++vueltas < 50);
-    if (cambios) { await guardar("feed"); pintarMovimientos(); }
-    estadoMov(`🟢 En directo · actualizado a las ${new Date().toLocaleTimeString("es-ES")}`);
-  } catch (e) {
-    if (e.status === 403 || e.status === 401) { S.ajustes.responsable = false; await guardar("ajustes"); pintarRol(); return; }
-    estadoMov(`🔴 ${e instanceof TypeError ? "Sin conexión" : e.message}. Reintentando…`);
-  } finally { consultando = false; }
-}
-// Solo se consulta con la pestaña a la vista, para no gastar peticiones de Netlify
-function programarMov() {
-  clearTimeout(timerMov);
-  if (!movVisible()) return;
-  timerMov = setTimeout(async () => { await consultarMov(); programarMov(); }, 10000);
-}
 function pintarRol() {
-  $("#nav-mov").classList.toggle("hidden", !S.ajustes.responsable);
-  // el traspaso por bases es solo del responsable
+  // el traspaso por bases y los pickings con varios artículos son solo del responsable
   $("#nav-traspaso").classList.toggle("hidden", !S.ajustes.responsable);
   $("#card-traspaso").classList.toggle("hidden", !S.ajustes.responsable);
-  // los pickings con varios artículos también
   $("#nav-pick").classList.toggle("hidden", !S.ajustes.responsable);
-  if (!S.ajustes.responsable && ($("#tab-movimientos").classList.contains("on") || $("#tab-pickings").classList.contains("on"))) document.querySelector('nav button[data-tab="escanear"]').click();
-  pintarMovimientos(); pintarCargas(); pintarBase(); pintarAjustes();
+  if (!S.ajustes.responsable && $("#tab-pickings").classList.contains("on")) document.querySelector('nav button[data-tab="escanear"]').click();
+  pintarCargas(); pintarBase(); pintarAjustes();
 }
 async function comprobarRol() {
   if (!S.ajustes.codigo) { if (S.ajustes.responsable) { S.ajustes.responsable = false; await guardar("ajustes"); pintarRol(); } return; }
@@ -1298,26 +1208,17 @@ async function copiar(t) {
   }
   toast(`Copiado: ${t}`);
 }
-async function cambiarEstadoMov(tipo, id) {
-  const ev = { tipo, id, en: Date.now(), responsable: true };
-  aplicarEvento(ev);
-  await guardar("feed");
-  await encolar({ tipo, id });
-  pintarMovimientos();
-  enviarCola();
-}
-
 // ---------- base compartida ----------
 // El responsable carga los Excel y los ajustes; los demás dispositivos descargan lo que cambia.
 // Cada uno guarda su copia, así que sin cobertura se sigue trabajando con la última.
 const TIPOS_BASE = ["stock", "maestro", "vacias", "tipos", "ajustes"];
 const soloLectura = () => !!S.ajustes.codigo && !S.ajustes.responsable;
 const BASE = { metas: null, comprobada: 0, error: "" };
-const datosBase = (t) => t === "tipos" ? { mapa: S.tiposUbi } : t === "ajustes" ? { niveles: S.ajustes.niveles, digitos: S.ajustes.digitos } : S[t];
+const datosBase = (t) => t === "tipos" ? { mapa: S.tiposUbi } : t === "ajustes" ? { niveles: S.ajustes.niveles, digitos: S.ajustes.digitos, playa: S.ajustes.playa ?? PLAYA_DEF } : S[t];
 const hayDatos = (t) => (t === "tipos" ? Object.keys(S.tiposUbi || {}).length > 0 : !!datosBase(t));
 async function aplicarBase(t, datos) {
   if (t === "tipos") { S.tiposUbi = datos.mapa || {}; await guardar("tiposUbi"); }
-  else if (t === "ajustes") { S.ajustes.niveles = datos.niveles ?? S.ajustes.niveles; S.ajustes.digitos = datos.digitos ?? S.ajustes.digitos; await guardar("ajustes"); }
+  else if (t === "ajustes") { S.ajustes.niveles = datos.niveles ?? S.ajustes.niveles; S.ajustes.digitos = datos.digitos ?? S.ajustes.digitos; S.ajustes.playa = datos.playa ?? S.ajustes.playa; await guardar("ajustes"); }
   else { S[t] = datos; await guardar(t); }
 }
 async function pasoBase() {
@@ -1401,7 +1302,6 @@ const cambiarAlmacen = (z) => (colaBase = colaBase.then(async () => {
     try { localStorage.removeItem("ubiActual"); } catch {}
     $("#mapeo").style.display = "none";
     refrescar();
-    pintarMovimientos();
   }
   await pasoBase();
 }));
@@ -1421,26 +1321,25 @@ function pintarBase() {
   $("#btn-compartir")?.addEventListener("click", async () => { await subirBase(faltan); if (!BASE.error) toast("Compartido con todos los dispositivos"); });
 }
 function pintarInforme() {
-  const { mov, mezcla, vacios } = calcularInforme();
+  const { mov, mezcla, vacios, caducados } = calcularInforme();
+  CADUCADOS = caducados;
   MOVS = mov;
-  pintarHechos();
-  const pendientes = mov.filter((m) => !hechoDe(m)).length;
   const f = norm($("#filtro-informe").value);
   const pasa = (...t) => !f || t.some((x) => norm(x).includes(f));
   const hayStock = IDX.articulos.size && S.stock;
 
   $("#tiles").innerHTML = [
-    [pendientes, `movimientos pendientes (de ${mov.length})`], [mezcla.length, "pickings con problemas"], [vacios.length, "pickings sin su artículo"], [hechosAlmacen().length, "movimientos anotados"],
+    [mov.length, "movimientos a hacer"], [mezcla.length, "pickings con problemas"], [vacios.length, "pickings sin su artículo"], [caducados.length, "UA caducadas (505)"],
   ].map(([n, t]) => `<div class="tile"><b>${n}</b><span>${t}</span></div>`).join("");
 
-  if (!hayStock) { ["#inf-mov", "#inf-mezcla", "#inf-vacios"].forEach((s) => ($(s).innerHTML = `<p class="muted">Carga el Excel de stock.</p>`)); return; }
+  if (!hayStock) { ["#inf-mov", "#inf-mezcla", "#inf-vacios", "#inf-cad"].forEach((s) => ($(s).innerHTML = `<p class="muted">Carga el Excel de stock.</p>`)); return; }
   const sinMaestro = !IDX.hayMaestro ? `<p class="muted">⚠️ Sin maestro de picking solo puedo detectar mezclas de artículos, no adónde va cada uno.</p>` : "";
 
   const m1 = mov.filter((m) => pasa(m.desde, m.destino, m.f.articulo, m.f.descripcion, m.f.ua));
-  $("#inf-mov").innerHTML = sinMaestro + (m1.length ? `<ul class="list">${m1.slice(0, LIM).map((m) => { const h = hechoDe(m); return `<li class="${h ? "hecho" : ""}">
-      <div><b>${esc(m.desde)}</b> → <b>${esc(m.destino)}</b> ${h ? `<span class="badge ok">✔ Anotado · ${esc(h.cajas)} cajas</span>` : ""} <span class="badge ${m.estadoDest.startsWith("Destino también") ? "bad" : m.estadoDest.startsWith("Sin") ? "warn" : "ok"}">${esc(m.estadoDest)}</span></div>
+  $("#inf-mov").innerHTML = sinMaestro + (m1.length ? `<ul class="list">${m1.slice(0, LIM).map((m) => `<li>
+      <div><b>${esc(m.desde)}</b> → <b>${esc(m.destino)}</b> <span class="badge ${m.estadoDest.startsWith("Destino también") ? "bad" : m.estadoDest.startsWith("Sin") ? "warn" : "ok"}">${esc(m.estadoDest)}</span></div>
       <div>${esc(m.f.articulo)} · ${esc(m.f.descripcion)}</div>
-      <div class="muted mono">UA ${esc(m.f.ua)} · lote ${esc(m.f.lote)} · ${esc(m.f.cajas)} cajas</div></li>`; }).join("")}</ul>${m1.length > LIM ? `<p class="muted">Mostrando ${LIM} de ${m1.length}. Exporta a Excel para verlos todos.</p>` : ""}` : `<p class="muted">Nada que mover 👍</p>`);
+      <div class="muted mono">UA ${esc(m.f.ua)} · lote ${esc(m.f.lote)} · ${esc(m.f.cajas)} cajas</div></li>`).join("")}</ul>${m1.length > LIM ? `<p class="muted">Mostrando ${LIM} de ${m1.length}. Exporta a Excel para verlos todos.</p>` : ""}` : `<p class="muted">Nada que mover 👍</p>`);
 
   const m2 = mezcla.filter((m) => pasa(verUbi(m.u), ...m.arts.map(nomArt)));
   $("#inf-mezcla").innerHTML = m2.length ? `<ul class="list">${m2.slice(0, LIM).map((m) => `<li>
@@ -1448,15 +1347,21 @@ function pintarInforme() {
       <div class="muted">Asignado: ${m.asign ? esc(nomArt(m.asign)) : "— sin asignar en el maestro —"}</div>
       <div>${m.arts.map((k) => `${m.intrusos.includes(k) ? "❌" : "✅"} ${esc(nomArt(k))}`).join("<br>")}</div></li>`).join("")}</ul>` : `<p class="muted">Ningún picking mezclado 👍</p>`;
 
+  const m4 = caducados.filter((f) => pasa(f.ubicacion, f.articulo, f.descripcion, f.lote, f.ua));
+  $("#inf-cad").innerHTML = m4.length ? `<p class="muted">${m4.length} UA · ${nCajas(m4.reduce((n, f) => n + cajasDe(f), 0))}</p><ul class="list">${m4.slice(0, LIM).map((f) => `<li>
+      <div><b>${esc(f.ubicacion)}</b> <span class="badge ${esPicking(f.ubicacion) ? "ok" : ""}">${esPicking(f.ubicacion) ? "Picking" : esPlaya(f.ubicacion) ? "Playa" : "Reserva"}</span> <span class="badge bad">${esc(f.situacion || "505")} caducado</span></div>
+      <div>${esc(f.articulo)} · ${esc(f.descripcion)}</div>
+      <div class="muted mono">UA ${esc(f.ua)} · lote ${esc(f.lote)} · cad. ${esc(verFecha(f.cad))} · ${esc(f.cajas)} cajas</div></li>`).join("")}</ul>${m4.length > LIM ? `<p class="muted">Mostrando ${LIM} de ${m4.length}. Exporta a Excel para verlos todos.</p>` : ""}` : `<p class="muted">No hay stock caducado 👍</p>`;
+
   const m3 = vacios.filter((v) => pasa(verUbi(v.u), nomArt(v.k)));
   $("#inf-vacios").innerHTML = IDX.hayMaestro ? (m3.length ? `<ul class="list">${m3.slice(0, LIM).map((v) => `<li>
       <div><b>${esc(verUbi(v.u))}</b> · ${esc(nomArt(v.k))}</div>
       ${v.ocupado.length ? `<div class="muted">Ocupado por: ${v.ocupado.map((k) => esc(nomArt(k))).join("; ")}</div>` : ""}
-      <div class="muted">${v.reserva.length ? `Reponer desde: ${v.reserva.slice(0, 3).map((f) => `${esc(f.ubicacion)} (lote ${esc(f.lote)}, cad. ${esc(verFecha(f.cad))}${disponible(f) ? "" : `, <b style="color:var(--bad)">sit. ${esc(f.situacion)}</b>`})`).join(", ")}` : "Sin palets en reserva"}</div></li>`).join("")}</ul>` : `<p class="muted">Todos los pickings tienen su artículo 👍</p>`) : `<p class="muted">Necesito el maestro de picking.</p>`;
+      <div class="muted">${v.reserva.length ? `Reponer desde: ${v.reserva.slice(0, 3).map((f) => `${esc(f.ubicacion)} (lote ${esc(f.lote)}, cad. ${esc(verFecha(f.cad))}${disponible(f) ? "" : caducado(f) ? `, <b style="color:var(--bad)">caducado</b>` : `, <b style="color:var(--bad)">sit. ${esc(f.situacion)}</b>`})`).join(", ")}` : "Sin palets en reserva"}</div></li>`).join("")}</ul>` : `<p class="muted">Todos los pickings tienen su artículo 👍</p>`) : `<p class="muted">Necesito el maestro de picking.</p>`;
 }
 function exportarMovimientos() {
   if (!MOVS.length) { toast("No hay movimientos"); return; }
-  const filas = MOVS.map((m) => ({ "Desde": m.desde, "Hacia": m.destino, "Estado destino": m.estadoDest, "Artículo": m.f.articulo, "Descriptivo": m.f.descripcion, "UA": m.f.ua, "Lote": m.f.lote, "Caducidad": verFecha(m.f.cad), "Cajas": m.f.cajas, "Situación": m.f.situacion, "Cajas movidas": hechoDe(m)?.cajas ?? "" }));
+  const filas = MOVS.map((m) => ({ "Desde": m.desde, "Hacia": m.destino, "Estado destino": m.estadoDest, "Artículo": m.f.articulo, "Descriptivo": m.f.descripcion, "UA": m.f.ua, "Lote": m.f.lote, "Caducidad": verFecha(m.f.cad), "Cajas": m.f.cajas, "Situación": m.f.situacion }));
   descargarExcel(filas, "Movimientos", `movimientos_picking_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 function descargarExcel(filas, hoja, nombre) {
@@ -1641,14 +1546,15 @@ function pintarCodigo(paso = "") {
 function pintarAjustes() {
   $("#aj-digitos").value = S.ajustes.digitos;
   $("#aj-niveles").value = S.ajustes.niveles;
-  // los niveles son de la base compartida: solo los cambia el responsable
-  ["#aj-digitos", "#aj-niveles"].forEach((s) => { $(s).disabled = soloLectura(); });
+  $("#aj-playa").value = S.ajustes.playa ?? PLAYA_DEF;
+  // los niveles y la playa son de la base compartida: solo los cambia el responsable
+  ["#aj-digitos", "#aj-niveles", "#aj-playa"].forEach((s) => { $(s).disabled = soloLectura(); });
   pintarCodigo();
   $("#aj-tema").value = S.ajustes.tema;
   const ej = [...IDX.ubiOriginal.values()][0] || "01-001-1";
   const pp = partesUbi(ej);
   const conTipo = [...TIPO_UBI.values()];
-  $("#aj-ejemplo").innerHTML = `Ejemplo: <b>${esc(ej)}</b> → ${pp?.zona ? `${esc(ALMACENES[pp.zona] || `almacén ${pp.zona}`)}, ` : ""}${pp ? `fila ${esc(pp.fila)}, hueco ${esc(pp.hueco)}, ` : ""}nivel ${esc(nivelDe(ej))} (${esPicking(ej) ? "picking" : "reserva"})` +
+  $("#aj-ejemplo").innerHTML = `Ejemplo: <b>${esc(ej)}</b> → ${pp?.zona ? `${esc(ALMACENES[pp.zona] || `almacén ${pp.zona}`)}, ` : ""}${pp ? `fila ${esc(pp.fila)}, hueco ${esc(pp.hueco)}, ` : ""}nivel ${esc(nivelDe(ej))} (${esPicking(ej) ? "picking" : esPlaya(ej) ? "playa, reserva" : "reserva"})` +
     (conTipo.length ? `<br>Tipo conocido de ${conTipo.length} ubicaciones: ${conTipo.filter(Boolean).length} picking, ${conTipo.filter((x) => !x).length} otras.` : "");
   pintarUso();
 }
@@ -1794,7 +1700,7 @@ function calcularLibres() {
     const c = codUbi(v.ubicacion), p = partesUbi(v.ubicacion) || partesUbi(c);
     if (!c || !p || vistas.has(c) || (z && !c.startsWith(z))) continue;
     vistas.add(c);
-    if (!(TIPO_UBI.get(normUbi(v.ubicacion)) ?? esPicking(c))) continue; // la reserva nunca tiene artículo asignado
+    if (esPlaya(c) || !(TIPO_UBI.get(normUbi(v.ubicacion)) ?? esPicking(c))) continue; // la reserva (y la playa) nunca tiene artículo asignado
     if (asignadas.has(c)) continue;
     if (IDX.stockPorUbi.has(c)) { conStock.push(c); continue; }
     const nivel = parseInt(p.nivel, 10);
@@ -1925,19 +1831,154 @@ async function pdfLibres() {
   finally { b.disabled = false; }
 }
 
+// ---------- descargas: listado de pedidos de compras (PDF) ----------
+// Se lee el texto del PDF (no hace falta IA): se juntan los trozos que están a la misma altura en líneas
+// y se reconoce cada línea: PROVEEDOR…, un artículo, la continuación de su descripción o TOTAL PEDIDO.
+let PED = null; // { archivo, cargado, fechaListado, organizacion, pedidos: [...], totalGeneral }
+let pdfJsListo = null;
+const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+function cargarPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  return (pdfJsListo ||= new Promise((res, rej) => {
+    const sc = document.createElement("script");
+    sc.src = PDFJS + "pdf.min.js";
+    sc.onload = () => {
+      if (!window.pdfjsLib) return rej(new Error("sin pdf.js"));
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js";
+      res(window.pdfjsLib);
+    };
+    sc.onerror = () => { pdfJsListo = null; rej(new Error("sin conexión")); };
+    document.head.appendChild(sc);
+  }));
+}
+async function lineasPdf(datos) {
+  const lib = await cargarPdfJs();
+  const pdf = await lib.getDocument({ data: datos }).promise;
+  const lineas = [];
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const tc = await (await pdf.getPage(n)).getTextContent();
+    const items = tc.items.filter((i) => i.str && i.str.trim()).map((i) => ({ x: i.transform[4], y: i.transform[5], t: i.str.trim() }));
+    const filas = [];
+    for (const it of items.sort((a, b) => b.y - a.y)) {
+      const f = filas.find((f) => Math.abs(f.y - it.y) <= 2);
+      if (f) f.items.push(it); else filas.push({ y: it.y, items: [it] });
+    }
+    for (const f of filas.sort((a, b) => b.y - a.y)) {
+      f.items.sort((a, b) => a.x - b.x);
+      lineas.push({ pag: n, y: f.y, items: f.items, texto: f.items.map((i) => i.t).join(" ").replace(/\s+/g, " ").trim() });
+    }
+  }
+  return lineas;
+}
+const RX_FECHA = /\d{2}\/\d{2}\/\d{4}/;
+const RX_NUM = /^-?[\d.]*\d,\d+$|^-?\d+$/;
+function leerListado(lineas) {
+  const L = { fechaListado: "", organizacion: "", pedidos: [], totalGeneral: "", totalOrg: "" };
+  let ped = null, art = null;
+  for (const ln of lineas) {
+    const t = ln.texto;
+    let m;
+    // la fecha del listado va arriba a la derecha («17/11/2026 PAG. 1»), a veces en la misma línea que el título
+    if ((m = t.match(/(\d{2}\/\d{2}\/\d{4})\s+PAG\.?\s*\d+/i))) L.fechaListado ||= m[1];
+    if (/^LISTADO PEDIDOS/i.test(t) || /^GARCIMAR/i.test(t) || /^STA\b|^ARTICULO\b.*ENTREGA/i.test(t)) { art = null; continue; }
+    if (/^\d{2}\/\d{2}\/\d{4}\s+PAG\.?\s*\d+/i.test(t)) { art = null; continue; }
+    if (/^ORGANIZACI[OÓ]N COMPRAS/i.test(t)) { L.organizacion ||= t.replace(/^ORGANIZACI[OÓ]N COMPRAS\s*/i, "").trim(); art = null; continue; }
+    if ((m = t.match(/^TOTAL POR ORGANIZACI[OÓ]N:?\s*(\S+)?/i))) { L.totalOrg = m[1] || ""; art = null; continue; }
+    if ((m = t.match(/^TOTAL GENERAL:?\s*(\S+)?/i))) { L.totalGeneral = m[1] || ""; art = null; continue; }
+    if ((m = t.match(/^PROVEEDOR\s*(\d+)\s+(.*)$/i))) {
+      const resto = m[2];
+      const g = (rx) => (resto.match(rx) || [])[1]?.trim() || "";
+      ped = {
+        prov: m[1], nombre: resto.split(/\s+SERIE\s*\/\s*PEDIDO/i)[0].trim(),
+        pedido: g(/SERIE\s*\/\s*PEDIDO\s*(.*?)\s*(?:REF\.|FECHA|DIVISA|$)/i), ref: g(/REF\.\s*(.*?)\s*(?:FECHA|DIVISA|$)/i),
+        fecha: g(/FECHA\s*(\d{2}\/\d{2}\/\d{4})/i), divisa: g(/DIVISA\s*(\S+)/i), lineas: [], total: null,
+      };
+      L.pedidos.push(ped); art = null; continue;
+    }
+    if ((m = t.match(/^TOTAL PEDIDO:?\s*(.*)$/i))) {
+      const n = m[1].split(" ").filter((x) => RX_NUM.test(x));
+      if (ped) ped.total = { pedidas: n[0] || "", pdtes: n[1] || "", importe: n[2] || "" };
+      art = null; continue;
+    }
+    // artículo: código (6 cifras y a veces una letra), descripción, fecha de entrega y las cifras
+    if (ped && (m = t.match(/^(?:\S{1,3}\s+)??(\d{5,7}[A-Z]?)\s+(.*?)\s*(\d{2}\/\d{2}\/\d{4})\s+(.*)$/)) && /\d,\d/.test(m[4])) {
+      const tok = m[4].replace(/(\d)([A-Za-z]{1,3})(?=\s|$)/g, "$1 $2").split(" ").filter(Boolean);
+      const pedidas = tok.shift() || "";
+      const unidad = tok[0] && !RX_NUM.test(tok[0]) ? tok.shift() : "";
+      const [pdtes = "", precio = "", dto = "", neto = "", importe = ""] = tok;
+      const codItem = ln.items.find((i) => i.t.startsWith(m[1])) || ln.items[0];
+      const fechaItem = ln.items.find((i) => RX_FECHA.test(i.t));
+      art = { art: m[1], desc: m[2], entrega: (t.match(RX_FECHA) || [])[0] || "", pedidas, unidad, pdtes, precio, dto, neto, importe, pag: ln.pag, y: ln.y, xCod: codItem.x, xFecha: fechaItem ? fechaItem.x : Infinity };
+      ped.lineas.push(art); continue;
+    }
+    // segunda línea de la descripción: justo debajo del artículo, en la columna de la descripción y sin cifras
+    if (art && ln.pag === art.pag && art.y - ln.y < 14 && ln.items[0].x > art.xCod + 4 && ln.items[0].x < art.xFecha && !RX_FECHA.test(t)) {
+      art.desc = `${art.desc} ${t}`.trim();
+      art.y = ln.y;
+      continue;
+    }
+  }
+  L.pedidos = L.pedidos.filter((p) => p.lineas.length);
+  return L;
+}
+const pickingsDe = (cod) => IDX.pickingDeArt.get(normArt(cod)) || [];
+async function cargarListado(file) {
+  if (!file) return;
+  const est = $("#ped-estado");
+  const aviso = (msg) => { est.classList.toggle("hidden", !msg); est.innerHTML = msg || ""; };
+  try {
+    aviso("Leyendo el PDF…");
+    const L = leerListado(await lineasPdf(new Uint8Array(await file.arrayBuffer())));
+    if (!L.pedidos.length) { aviso("⚠️ No he encontrado pedidos en este PDF. ¿Es el «Listado pedidos de compras»?"); return; }
+    PED = { ...L, archivo: file.name, cargado: Date.now() };
+    await store.set("pedidos", PED);
+    aviso("");
+    pintarDescargas();
+    toast(`Listado cargado: ${L.pedidos.length} pedidos`);
+  } catch (e) {
+    aviso(`⚠️ No he podido leer el PDF (${esc(e.message)}).${/conexi/.test(e.message) ? " Comprueba la conexión: la primera vez hay que descargar el lector de PDF." : ""}`);
+  }
+}
+function pintarDescargas() {
+  const doc = $("#ped-doc");
+  $("#ped-acciones").classList.toggle("hidden", !PED);
+  if (!PED) { $("#ped-tiles").innerHTML = ""; doc.innerHTML = ""; return; }
+  const lineas = PED.pedidos.flatMap((p) => p.lineas);
+  const sinPk = lineas.filter((l) => !pickingsDe(l.art).length).length;
+  const provs = new Set(PED.pedidos.map((p) => p.prov)).size;
+  $("#ped-tiles").innerHTML = [[provs, "proveedores"], [PED.pedidos.length, "pedidos"], [lineas.length, "artículos"], [sinPk, "sin picking asignado"]]
+    .map(([n, t]) => `<div class="tile"><b>${n}</b><span>${t}</span></div>`).join("");
+  const sinMaestro = !IDX.hayMaestro ? `<div class="card noprint"><p class="muted" style="margin:0">⚠️ No hay maestro de picking cargado para ${esc(nombreAlmacen(S.ajustes.zona))}: no puedo decir el picking de ningún artículo.</p></div>` : "";
+  const celdaPk = (cod) => { const pk = pickingsDe(cod); return pk.length ? pk.map((u) => `<div class="ped-pk">${esc(u)}</div>`).join("") : `<span class="ped-sin">SIN PICKING</span>`; };
+  const ahora = new Date().toLocaleString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  doc.innerHTML = `${sinMaestro}<div class="ped-titulo"><h2>LISTADO PEDIDOS DE COMPRAS · UBICACIÓN DE PICKING</h2>
+    <p>${esc(nombreAlmacen(S.ajustes.zona))}${PED.organizacion ? ` · ${esc(PED.organizacion)}` : ""}${PED.fechaListado ? ` · listado del ${esc(PED.fechaListado)}` : ""} · impreso el ${esc(ahora)}</p></div>
+    ${PED.pedidos.map((p) => `<div class="ped">
+      <div class="ped-cab"><b>PROVEEDOR ${esc(p.prov)} ${esc(p.nombre)}</b><span>Serie/pedido ${esc(p.pedido)}</span>${p.ref ? `<span>Ref. ${esc(p.ref)}</span>` : ""}${p.fecha ? `<span>Fecha ${esc(p.fecha)}</span>` : ""}${p.divisa ? `<span class="imp">Divisa ${esc(p.divisa)}</span>` : ""}</div>
+      <table class="ped-tbl"><thead><tr><th>Artículo</th><th>Descripción</th><th class="imp">Entrega</th><th class="num">Ud. pedidas</th><th class="num imp">Ud. pdtes.</th><th class="num imp">Precio</th><th class="num imp">% Dto</th><th class="num imp">Pr. neto</th><th class="num imp">Importe</th><th>Picking</th></tr></thead>
+      <tbody>${p.lineas.map((l) => `<tr><td class="cod">${esc(l.art)}</td><td>${esc(l.desc)}</td><td class="imp">${esc(l.entrega)}</td><td class="num">${esc(l.pedidas)} ${esc(l.unidad)}</td><td class="num imp">${esc(l.pdtes)}</td><td class="num imp">${esc(l.precio)}</td><td class="num imp">${esc(l.dto)}</td><td class="num imp">${esc(l.neto)}</td><td class="num imp">${esc(l.importe)}</td><td>${celdaPk(l.art)}</td></tr>`).join("")}</tbody>
+      ${p.total ? `<tfoot><tr><td></td><td>TOTAL PEDIDO</td><td class="imp"></td><td class="num">${esc(p.total.pedidas)}</td><td class="num imp">${esc(p.total.pdtes)}</td><td class="imp" colspan="3"></td><td class="num imp">${esc(p.total.importe)}</td><td></td></tr></tfoot>` : ""}</table>
+    </div>`).join("")}
+    ${PED.totalGeneral ? `<p class="imp" style="text-align:right;font-weight:700;margin:4px 0 0">TOTAL GENERAL: ${esc(PED.totalGeneral)}</p>` : ""}`;
+}
+function exportarListado() {
+  if (!PED) return;
+  const filas = PED.pedidos.flatMap((p) => p.lineas.map((l) => ({ "Proveedor": `${p.prov} ${p.nombre}`, "Serie/pedido": p.pedido, "Ref.": p.ref, "Fecha pedido": p.fecha, "Artículo": l.art, "Descripción": l.desc, "Entrega": l.entrega,
+    "Ud. pedidas": l.pedidas, "Unidad": l.unidad, "Ud. pdtes.": l.pdtes, "Precio": l.precio, "% Dto": l.dto, "Pr. neto": l.neto, "Importe": l.importe, "Picking": pickingsDe(l.art).join(" / ") || "SIN PICKING" })));
+  descargarExcel(filas, "Descargas", `descargas_picking_${S.ajustes.zona}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
 function refrescar() {
   construirIndice();
   pintarAlmacen();
   $("#aviso-sin-datos").classList.toggle("hidden", !!S.stock);
-  pintarCargas(); pintarInforme(); pintarPickings(); pintarLibres(); pintarAjustes();
+  pintarCargas(); pintarInforme(); pintarPickings(); pintarLibres(); pintarDescargas(); pintarAjustes();
 }
 
 document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click", () => {
   document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("on", x === b));
   document.querySelectorAll("section.tab").forEach((s) => s.classList.toggle("on", s.id === "tab-" + b.dataset.tab));
   window.scrollTo(0, 0);
-  if (movVisible()) consultarMov();
-  programarMov();
 }));
 // La base cambia poco: se comprueba al volver a la app (como mucho una vez por minuto) y cada 5 minutos con ella abierta
 setInterval(() => { if (document.visibilityState === "visible") sincronizarBase(); }, 5 * 60000);
@@ -1945,25 +1986,8 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "visible") return;
   enviarCola();
   if (Date.now() - BASE.comprobada > 60000) sincronizarBase();
-  if (movVisible()) consultarMov();
-  programarMov();
 });
 window.addEventListener("online", enviarCola);
-$("#tab-movimientos").addEventListener("click", (e) => {
-  const b = e.target.closest("button");
-  if (!b) return;
-  if (b.dataset.copiar) copiar(b.dataset.copiar);
-  else if (b.dataset.hecho) cambiarEstadoMov("hecho", b.dataset.hecho);
-  else if (b.dataset.deshacer) cambiarEstadoMov("deshacer", b.dataset.deshacer);
-  else if (b.dataset.borrar && confirm("¿Borrar este movimiento para todos? Si ya lo registraste en el sistema, corrígelo también allí.")) cambiarEstadoMov("borrar", b.dataset.borrar);
-});
-$("#mov-buscar").addEventListener("input", pintarMovimientos);
-$("#btn-export-feed").addEventListener("click", () => {
-  const todos = Object.values(S.feed.movs).filter((m) => !m.eliminado && enZona(m.hacia)).sort((a, b) => a.llegada - b.llegada);
-  if (!todos.length) return toast("No hay movimientos");
-  const filas = todos.map((m) => ({ "Fecha": new Date(m.fecha).toLocaleString("es-ES"), "Móvil": m.movil, "Artículo": m.articulo, "Descriptivo": m.descripcion, "Cajas": m.cajas, "Lote": m.lote, "Caducidad": verFecha(m.caducidad), "A su picking": codigoSistema(m.hacia), "Desde": m.desde, "UA": m.ua, "Estado": m.anulado ? "Borrado por el operario" : m.estado === "hecho" ? "Hecho" : "Por hacer" }));
-  descargarExcel(filas, "Movimientos", `movimientos_compartidos_${new Date().toISOString().slice(0, 10)}.xlsx`);
-});
 $("#btn-ir-datos").addEventListener("click", () => document.querySelector('nav button[data-tab="datos"]').click());
 $("#btn-foto").addEventListener("click", () => $("#in-foto").click());
 $("#btn-galeria").addEventListener("click", () => $("#in-galeria").click());
@@ -1983,6 +2007,10 @@ $("#btn-pick-reset").addEventListener("click", async () => {
   await guardar("pickHechos"); PICK_VISTA.pestana = "pend"; pintarPickings();
 });
 $("#btn-libres-pdf").addEventListener("click", pdfLibres);
+$("#in-pedidos").addEventListener("change", (e) => { cargarListado(e.target.files[0]); e.target.value = ""; });
+$("#btn-ped-imprimir").addEventListener("click", () => { pintarDescargas(); window.print(); });
+$("#btn-ped-excel").addEventListener("click", exportarListado);
+$("#btn-ped-quitar").addEventListener("click", async () => { PED = null; await store.del("pedidos"); pintarDescargas(); });
 $("#libres-niveles").addEventListener("change", (e) => {
   const n = +e.target.dataset.nivel;
   if (e.target.checked) LIBRES_VISTA.fuera.delete(n); else LIBRES_VISTA.fuera.add(n);
@@ -2004,20 +2032,13 @@ $("#tab-pickings").addEventListener("click", async (e) => {
   await guardar("pickHechos"); pintarPickings();
 });
 $("#btn-export-mov").addEventListener("click", exportarMovimientos);
-$("#btn-export-hechos").addEventListener("click", () => {
-  const hechos = hechosAlmacen();
-  if (!hechos.length) return toast("No hay movimientos anotados");
-  const filas = hechos.map((h) => ({ "Fecha": new Date(h.fecha).toLocaleString("es-ES"), "Desde": h.desde, "Hacia": h.hacia, "Artículo": h.articulo, "Descriptivo": h.descripcion, "UA": h.ua, "Lote": h.lote, "Caducidad": verFecha(h.caducidad || ""), "Cajas movidas": h.cajas }));
-  descargarExcel(filas, "Anotados", `movimientos_anotados_${new Date().toISOString().slice(0, 10)}.xlsx`);
-});
-$("#btn-borrar-hechos").addEventListener("click", async () => {
-  const hechos = hechosAlmacen();
-  if (!hechos.length || !confirm(`¿Borrar todos los movimientos anotados de ${nombreAlmacen(S.ajustes.zona)}? Exporta antes si los necesitas.`)) return;
-  const bloqueados = await quitarHechos(hechos); pintarInforme();
-  if (!bloqueados) toast("Movimientos anotados borrados");
+$("#btn-export-cad").addEventListener("click", () => {
+  if (!CADUCADOS.length) return toast("No hay stock caducado");
+  descargarExcel(CADUCADOS.map((f) => ({ "Ubicación": f.ubicacion, "Tipo": esPicking(f.ubicacion) ? "Picking" : esPlaya(f.ubicacion) ? "Playa" : "Reserva", "Artículo": f.articulo, "Descriptivo": f.descripcion, "UA": f.ua, "Lote": f.lote, "Caducidad": verFecha(f.cad), "Cajas": f.cajas, "Situación": f.situacion })),
+    "Caducado", `stock_caducado_${S.ajustes.zona}_${new Date().toISOString().slice(0, 10)}.xlsx`);
 });
 $("#btn-export-maestro").addEventListener("click", () => {
-  const filas = [...IDX.asignadoPorUbi].map(([u, k]) => ({ "Artículo": IDX.articulos.get(k)?.articulo || k, "Descriptivo": IDX.articulos.get(k)?.descripcion || "", "Ubicación picking": verUbi(u) }));
+  const filas = [...IDX.asignadosDeUbi].flatMap(([u, ks]) => [...ks].map((k) => [u, k])).map(([u, k]) => ({ "Artículo": IDX.articulos.get(k)?.articulo || k, "Descriptivo": IDX.articulos.get(k)?.descripcion || "", "Ubicación picking": verUbi(u) }));
   if (!filas.length) return toast("No hay maestro");
   descargarExcel(filas, "Maestro", "maestro_picking.xlsx");
 });
@@ -2042,11 +2063,12 @@ const guardarAjustes = () => {
   const antes = JSON.stringify(datosBase("ajustes"));
   S.ajustes.digitos = Math.max(1, Math.min(3, +$("#aj-digitos").value || 1));
   S.ajustes.niveles = $("#aj-niveles").value;
+  S.ajustes.playa = $("#aj-playa").value.trim();
   S.ajustes.tema = $("#aj-tema").value;
   guardar("ajustes"); aplicarTema(); construirIndice(); pintarCargas(); pintarInforme(); pintarPickings(); pintarLibres(); pintarAjustes();
   if (S.ajustes.responsable && JSON.stringify(datosBase("ajustes")) !== antes) subirBase(["ajustes"]);
 };
-["#aj-digitos", "#aj-niveles", "#aj-tema"].forEach((s) => $(s).addEventListener("change", guardarAjustes));
+["#aj-digitos", "#aj-niveles", "#aj-playa", "#aj-tema"].forEach((s) => $(s).addEventListener("change", guardarAjustes));
 $("#btn-almacen").addEventListener("click", () => mostrarElegir(true));
 $("#btn-cambiar-almacen").addEventListener("click", () => mostrarElegir(true));
 $("#elegir-lista").addEventListener("click", (e) => {
@@ -2062,15 +2084,16 @@ $("#btn-borrar-todo").addEventListener("click", async () => {
   if (!confirm("¿Borrar todos los Excel, alias y asignaciones de este móvil?")) return;
   // la cola no se borra: lo anotado sin cobertura se sigue enviando, y el historial compartido se vuelve a leer del servidor
   // la base compartida no se toca: este dispositivo la vuelve a descargar
-  for (const k of ["maestroManual", "alias", "mapeos", "hechos", "feed", "pickHechos"]) await store.del(k);
+  for (const k of ["maestroManual", "alias", "mapeos", "pickHechos", "pedidos"]) await store.del(k);
   for (const k of POR_ALMACEN) for (const z of Object.keys(ALMACENES)) await store.del(`${k}@${z}`);
-  S.stock = S.maestro = S.vacias = null; S.maestroManual = []; S.alias = {}; S.mapeos = {}; S.tiposUbi = {}; S.hechos = []; S.pickHechos = {}; S.feed = { cursor: "", movs: {} }; S.baseVer = {}; S.basePend = [];
-  refrescar(); pintarMovimientos(); toast("Datos borrados");
+  S.stock = S.maestro = S.vacias = null; PED = null; S.maestroManual = []; S.alias = {}; S.mapeos = {}; S.tiposUbi = {}; S.pickHechos = {}; S.baseVer = {}; S.basePend = [];
+  refrescar(); toast("Datos borrados");
   sincronizarBase();
 });
 
 (async () => {
   await cargarEstado();
+  PED = (await store.get("pedidos")) || null;
   aplicarTema();
   try { $("#ubi-actual").value = localStorage.getItem("ubiActual") || ""; } catch {}
   refrescar();
