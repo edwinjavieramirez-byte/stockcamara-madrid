@@ -251,7 +251,7 @@ const idb = (() => {
 // Un nombre que es el propio código (p. ej. la columna Descripción apuntando a la del artículo) no vale como nombre
 const nombreValido = (d, ref) => { const t = String(d ?? "").trim(); return t && normArt(t) !== normArt(ref) ? t : ""; };
 // Cambia en cada versión: si dos equipos muestran otra, uno tiene la página antigua (hay que recargarla)
-const VERSION_PAGINA = "23-11-2026 b";
+const VERSION_PAGINA = "23-11-2026 c";
 let AJ = { codigo: "", responsable: false, zona: "08", tema: "" };
 // ficha: items[ref] = { kgCaja, cajasBase, basesPalet, desc, t, por }; ver = versión compartida;
 // pendientes[ref] = lo cambiado en este equipo que aún no ha llegado a la base compartida
@@ -265,7 +265,7 @@ const guardarFicha = () => idb.set("fichaBases", F);
 
 // ---------- base compartida ----------
 async function api(body) {
-  const r = await fetch("/api/base", { method: "POST", headers: { "content-type": "application/json", "x-app-code": AJ.codigo || "" }, body: JSON.stringify(body) });
+  const r = await fetch("/api/base", { method: "POST", headers: { "content-type": "application/json", "x-app-code": AJ.codigo || "", "x-dispositivo": AJ.dispositivo || "" }, body: JSON.stringify(body) });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.error || `No se ha podido conectar con la base compartida (error ${r.status}). Se usa la copia de este equipo.`);
   return d;

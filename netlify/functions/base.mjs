@@ -12,6 +12,60 @@ const almacen = () => getStore({ name: "base", consistency: "strong" });
 const lista = (nombre) => (Netlify.env.get(nombre) || "").split(",").map((c) => c.trim()).filter(Boolean);
 const texto = (v, max = 200) => String(v ?? "").trim().slice(0, max);
 
+// ---------- dispositivos que usan la app y coste de la IA de todos ----------
+// Almacén «uso»: visto/<dispositivo> (última vez que sincronizó) y mes/<AAAA-MM>/<dispositivo> (lo anota escanear.mjs).
+// Del código de acceso solo se guarda el nombre (la parte antes del guion), nunca el código entero.
+const usoStore = () => getStore({ name: "uso", consistency: "strong" });
+const mesDe = (d) => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit" }).format(d);
+const seguro = (v) => String(v).replace(/[^\w-]/g, "_").slice(0, 40);
+function nombreMovil(codigo) {
+  if (lista("APP_CODE_RESPONSABLE").includes(codigo)) return "Responsable";
+  return codigo.includes("-") ? codigo.split("-")[0] : `Móvil ${lista("APP_CODE").indexOf(codigo) + 1}`;
+}
+const idDispositivo = (req, movil) => {
+  const d = (req.headers.get("x-dispositivo") || "").trim();
+  return /^[a-z0-9]{8,32}$/i.test(d) ? d : `cod-${seguro(movil)}`;
+};
+function equipoDe(ua = "") {
+  const so = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android"
+    : /Windows/.test(ua) ? "Windows" : /Macintosh|Mac OS X/.test(ua) ? "Mac" : /Linux/.test(ua) ? "Linux" : "Otro";
+  const nav = /Edg\//.test(ua) ? "Edge" : /SamsungBrowser/.test(ua) ? "Samsung" : /CriOS|Chrome\//.test(ua) ? "Chrome"
+    : /FxiOS|Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "";
+  return nav ? `${so} · ${nav}` : so;
+}
+async function anotarVisto(req, codigo, alm) {
+  try {
+    const movil = nombreMovil(codigo);
+    const id = idDispositivo(req, movil);
+    await usoStore().setJSON(`visto/${id}`, { id, movil, equipo: equipoDe(req.headers.get("user-agent") || ""), almacen: alm, ultimo: Date.now() });
+  } catch (e) {
+    console.error("No se ha podido anotar el dispositivo", e); // la sincronización sigue aunque falle
+  }
+}
+async function leerUso() {
+  const s = usoStore();
+  const todo = async (prefix) => {
+    const { blobs } = await s.list({ prefix });
+    return Promise.all(blobs.map(async (b) => ({ id: b.key.split("/").pop(), v: await s.get(b.key, { type: "json" }) })));
+  };
+  const mes = mesDe(new Date());
+  const [a, m] = mes.split("-").map(Number);
+  const anterior = m === 1 ? `${a - 1}-12` : `${a}-${String(m - 1).padStart(2, "0")}`;
+  const [vistos, este, previo] = await Promise.all([todo("visto/"), todo(`mes/${mes}/`), todo(`mes/${anterior}/`)]);
+  const disp = new Map();
+  const de = (id, v) => disp.get(id) || disp.set(id, { id, movil: v?.movil || "", equipo: "", almacen: "", ultimo: 0, llamadas: 0, coste: 0 }).get(id);
+  for (const { id, v } of vistos) if (v) Object.assign(de(id, v), { movil: v.movil, equipo: v.equipo, almacen: v.almacen, ultimo: v.ultimo });
+  for (const { id, v } of este) {
+    if (!v) continue;
+    const d = de(id, v);
+    d.llamadas = v.llamadas || 0;
+    d.coste = v.coste || 0;
+    d.ultimo = Math.max(d.ultimo, v.ultimo || 0);
+  }
+  const suma = (arr) => arr.reduce((t, { v }) => ({ llamadas: t.llamadas + (v?.llamadas || 0), coste: t.coste + (v?.coste || 0) }), { llamadas: 0, coste: 0 });
+  return { mes, total: suma(este), anterior: { mes: anterior, ...suma(previo) }, dispositivos: [...disp.values()], ahora: Date.now() };
+}
+
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
@@ -48,7 +102,16 @@ export default async (req) => {
   try {
     const store = almacen();
     const alm = /^\d{2}$/.test(body.almacen) ? body.almacen : ALMACEN_ANTIGUO;
-    if (body.accion === "estado") return json(await leerEstado(store, alm));
+    if (body.accion === "estado") {
+      const [estado] = await Promise.all([leerEstado(store, alm), anotarVisto(req, codigo, alm)]);
+      return json(estado);
+    }
+
+    // Cuántos dispositivos usan la app y lo que ha costado la IA entre todos: solo para el responsable
+    if (body.accion === "uso") {
+      if (!responsable) return json({ error: "Solo el responsable puede ver el uso de todos los dispositivos" }, 403);
+      return json(await leerUso());
+    }
 
     if (body.accion === "descargar") {
       if (!TIPOS.includes(body.tipo)) return json({ error: "Tipo desconocido" }, 400);

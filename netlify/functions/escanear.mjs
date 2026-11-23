@@ -1,6 +1,7 @@
 // Función de Netlify: recibe la foto de una etiqueta (o texto + candidatos)
 // y usa Claude para leerla. La clave de la API vive solo aquí, nunca en el móvil.
 import Anthropic from "@anthropic-ai/sdk";
+import { getStore } from "@netlify/blobs";
 
 // CLAUDE_API_KEY se configura en las variables de entorno de Netlify (ámbito: Functions).
 // No se usa ANTHROPIC_API_KEY porque Netlify puede inyectar ahí la credencial de su AI Gateway
@@ -62,6 +63,40 @@ async function llamar(content, schema) {
   return { datos: JSON.parse(texto), uso: response.usage };
 }
 
+// ---------- coste de la IA de todos los dispositivos ----------
+// Se guarda en Netlify Blobs (almacén «uso»): una entrada por mes y dispositivo, así nadie pisa a otro.
+// Del código de acceso solo se guarda el nombre (la parte antes del guion), nunca el código entero.
+const PRECIO = { in: 2 / 1e6, out: 10 / 1e6 }; // Claude Sonnet 5.5, $ por token (el mismo que usa la app)
+const usoStore = () => getStore({ name: "uso", consistency: "strong" });
+const mesActual = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit" }).format(new Date());
+const seguro = (v) => String(v).replace(/[^\w-]/g, "_").slice(0, 40);
+function nombreMovil(codigo, codigos, responsables) {
+  if (responsables.includes(codigo)) return "Responsable";
+  if (!codigo) return "Sin código";
+  return codigo.includes("-") ? codigo.split("-")[0] : `Móvil ${codigos.indexOf(codigo) + 1}`;
+}
+// Cada móvil se inventa un identificador al instalar la app; las versiones antiguas no lo mandan y cuentan por su código
+const idDispositivo = (req, movil) => {
+  const d = (req.headers.get("x-dispositivo") || "").trim();
+  return /^[a-z0-9]{8,32}$/i.test(d) ? d : `cod-${seguro(movil)}`;
+};
+async function anotarUso(id, movil, uso) {
+  try {
+    const s = usoStore();
+    const k = `mes/${mesActual()}/${id}`;
+    const a = (await s.get(k, { type: "json" })) || { llamadas: 0, entrada: 0, salida: 0, coste: 0 };
+    const entrada = (uso?.input_tokens || 0) + (uso?.cache_creation_input_tokens || 0) + (uso?.cache_read_input_tokens || 0);
+    const salida = uso?.output_tokens || 0;
+    Object.assign(a, {
+      movil, ultimo: Date.now(), llamadas: a.llamadas + 1,
+      entrada: a.entrada + entrada, salida: a.salida + salida, coste: a.coste + entrada * PRECIO.in + salida * PRECIO.out,
+    });
+    await s.setJSON(k, a);
+  } catch (e) {
+    console.error("No se ha podido anotar el uso", e); // el escaneo sigue aunque falle la cuenta
+  }
+}
+
 // Mensajes claros para la pantalla del móvil, en vez del error en bruto de la API
 function mensajeError(e) {
   if (e instanceof Anthropic.AuthenticationError) {
@@ -105,6 +140,8 @@ export default async (req) => {
 
   // Solo comprueba el código, sin llamar a Claude (no gasta nada), y dice si es de responsable
   if (body.accion === "comprobar") return json({ ok: true, responsable: responsables.includes(codigo) });
+  const movil = nombreMovil(codigo, codigos, responsables);
+  const dispositivo = idDispositivo(req, movil);
 
   try {
     if (body.accion === "leer") {
@@ -116,6 +153,7 @@ export default async (req) => {
         ],
         ESQUEMA_LECTURA
       );
+      await anotarUso(dispositivo, movil, r.uso);
       return json(r);
     }
 
@@ -140,6 +178,7 @@ Si codigo_articulo coincide con el código de un candidato, es una prueba muy fu
         ],
         ESQUEMA_ELECCION
       );
+      await anotarUso(dispositivo, movil, r.uso);
       return json(r);
     }
 

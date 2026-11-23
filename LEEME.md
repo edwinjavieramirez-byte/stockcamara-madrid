@@ -146,3 +146,11 @@ Página `public/traspaso.html` (en la app: pestaña **Traspaso**, o **Datos → 
 ## Coste
 
 Unos 1–1,5 céntimos por foto con Sonnet 5.5. La pestaña Ajustes muestra cuántas llamadas y cuánto llevas gastado este mes desde ese móvil.
+
+**Dispositivos y coste de todos (solo el responsable).** En Ajustes → Escaneo con IA, el botón **Ver dispositivos y coste de todos** enseña:
+
+- cuántos dispositivos usan la app (los que se han conectado en los últimos 30 días);
+- el coste de la IA de este mes sumando todos los dispositivos, y el del mes anterior;
+- una lista con cada dispositivo: nombre del código (`movil1`, `Responsable`…), tipo de equipo (iPhone, Android…), almacén, último uso, llamadas y coste del mes.
+
+Cómo se cuenta: cada dispositivo se inventa al instalar la app un identificador al azar que no dice nada de él. El servidor anota cuándo se conecta cada uno y lo que gasta cada foto (en Netlify Blobs, almacén `uso`). Del código de acceso solo se guarda el nombre (la parte antes del guion), nunca el código entero. Se empieza a contar desde que se sube esta versión: lo de antes solo estaba en cada móvil. Si un móvil reinstala la app o borra sus datos, sale como dispositivo nuevo. El coste es aproximado; la factura exacta está en la consola de Anthropic.

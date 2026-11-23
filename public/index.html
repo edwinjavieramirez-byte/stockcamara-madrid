@@ -403,6 +403,7 @@ mark { background: #fde047; color: #14212b; border-radius: 2px; }
       <h2>Escaneo con IA</h2>
       <div id="ia-codigo"></div>
       <p class="muted" id="aj-uso"></p>
+      <div id="aj-uso-todos" class="hidden"></div>
     </div>
     <div class="card">
       <h2>Tema</h2>
@@ -580,6 +581,12 @@ async function cargarEstado() {
   for (const k of ["hechos", "feed"]) store.del(k);
   for (const k of Object.keys(S)) { if (POR_ALMACEN.includes(k)) continue; const v = await store.get(k); if (v !== undefined) S[k] = v; }
   S.ajustes = Object.assign({ digitos: 1, niveles: "1,2", codigo: "", tema: "", zona: "08", responsable: false }, S.ajustes);
+  // Identificador de este dispositivo (al azar, no dice nada de él): sirve para contar cuántos usan la app
+  if (!/^[a-z0-9]{8,32}$/.test(S.ajustes.dispositivo || "")) {
+    const azar = crypto.getRandomValues(new Uint8Array(12));
+    S.ajustes.dispositivo = [...azar].map((b) => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36]).join("");
+    await guardar("ajustes");
+  }
   // Lo cargado antes de separar por almacén pasa al almacén que tenía elegido este dispositivo
   if (!S.ajustes.porAlmacen) {
     S.ajustes.zona = String(S.ajustes.zona || "").trim() || "08";
@@ -800,7 +807,7 @@ const PRECIO = { in: 2 / 1e6, out: 10 / 1e6 }; // Claude Sonnet 5.5, $ por token
 async function api(body) {
   const r = await fetch("/api/escanear", {
     method: "POST",
-    headers: { "content-type": "application/json", "x-app-code": S.ajustes.codigo || "" },
+    headers: { "content-type": "application/json", "x-app-code": S.ajustes.codigo || "", "x-dispositivo": S.ajustes.dispositivo || "" },
     body: JSON.stringify(body),
   });
   let j = null;
@@ -1148,7 +1155,7 @@ let ERROR_ENVIO = "", enviando = false, timerEnvio = null;
 async function apiMov(body, ruta = "/api/movimientos") {
   const r = await fetch(ruta, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-app-code": S.ajustes.codigo || "" },
+    headers: { "content-type": "application/json", "x-app-code": S.ajustes.codigo || "", "x-dispositivo": S.ajustes.dispositivo || "" },
     body: JSON.stringify(body),
   });
   let j = null;
@@ -1486,7 +1493,49 @@ function pintarUso() {
   const mes = new Date().toISOString().slice(0, 7);
   const u = S.uso.mes === mes ? S.uso : { llamadas: 0, coste: 0 };
   $("#aj-uso").textContent = `Este mes: ${u.llamadas} llamadas a la IA · coste aproximado ${u.coste.toFixed(2)} $ (desde este móvil).`;
+  const box = $("#aj-uso-todos");
+  box.classList.toggle("hidden", !S.ajustes.responsable);
+  if (S.ajustes.responsable && !box.innerHTML) box.innerHTML = `<button class="btn small" id="btn-uso-todos">Ver dispositivos y coste de todos</button>`;
 }
+// Solo el responsable: cuántos dispositivos usan la app y lo que cuesta la IA sumando todos (lo guarda el servidor)
+const ACTIVO_DIAS = 30;
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const nombreMes = (m) => { const [a, n] = String(m).split("-"); return `${MESES[Number(n) - 1] || m} ${a || ""}`.trim(); };
+const dolares = (x) => `${(x || 0).toFixed(2)} $`;
+function haceCuanto(t, ahora) {
+  if (!t) return "—";
+  const min = Math.max(0, Math.round((ahora - t) / 60000));
+  if (min < 2) return "ahora";
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `hace ${h} h`;
+  const d = Math.round(h / 24);
+  return d === 1 ? "ayer" : `hace ${d} días`;
+}
+async function verUsoTodos() {
+  const box = $("#aj-uso-todos");
+  box.innerHTML = `<p class="muted">Consultando el servidor…</p>`;
+  let r;
+  try { r = await apiMov({ accion: "uso" }, "/api/base"); }
+  catch (e) { box.innerHTML = `<p class="muted">No se ha podido consultar: ${esc(e.message)}</p><button class="btn small" id="btn-uso-todos">Reintentar</button>`; return; }
+  const limite = r.ahora - ACTIVO_DIAS * 864e5;
+  const lista = r.dispositivos.filter((d) => d.ultimo >= limite || d.llamadas > 0).sort((a, b) => b.coste - a.coste || b.ultimo - a.ultimo);
+  const antiguos = r.dispositivos.length - lista.length;
+  const filas = lista.map((d) => `<tr${d.id === S.ajustes.dispositivo ? ' class="here"' : ""}>
+      <td style="white-space:normal"><b>${esc(d.movil || "¿?")}</b>${d.id === S.ajustes.dispositivo ? " (este)" : ""}<br><span class="muted">${esc(d.equipo || "—")}${d.almacen ? " · " + esc(ALMACENES[d.almacen] || d.almacen) : ""}</span></td>
+      <td>${haceCuanto(d.ultimo, r.ahora)}</td><td>${d.llamadas}</td><td>${dolares(d.coste)}</td></tr>`).join("");
+  box.innerHTML = `<div class="tiles" style="margin-top:12px">
+      <div class="tile"><b>${lista.length}</b><span>dispositivos usando la app (últimos ${ACTIVO_DIAS} días)</span></div>
+      <div class="tile"><b>${dolares(r.total.coste)}</b><span>coste de la IA en ${nombreMes(r.mes)}, todos juntos · ${r.total.llamadas} llamadas</span></div>
+      <div class="tile"><b>${dolares(r.anterior.coste)}</b><span>${nombreMes(r.anterior.mes)} · ${r.anterior.llamadas} llamadas</span></div>
+    </div>
+    ${lista.length ? `<table class="tbl"><tr><th>Dispositivo</th><th>Último uso</th><th>Llamadas</th><th>Coste</th></tr>${filas}</table>` : `<p class="muted">Todavía no hay dispositivos anotados.</p>`}
+    <p class="muted">Coste aproximado con el precio de Claude Sonnet 5.5; la factura exacta está en la consola de Anthropic. Se cuenta desde que se subió esta versión.
+    ${antiguos ? ` ${antiguos > 1 ? `No salen ${antiguos} dispositivos` : "No sale 1 dispositivo"} sin uso en ${ACTIVO_DIAS} días.` : ""}
+    Un móvil que reinstale la app o borre sus datos sale como dispositivo nuevo.</p>
+    <button class="btn small" id="btn-uso-todos">Actualizar</button>`;
+}
+$("#aj-uso-todos").addEventListener("click", (e) => { if (e.target.id === "btn-uso-todos") verUsoTodos(); });
 // Código de acceso: una vez guardado no se vuelve a mostrar. Para cambiarlo hay que saber el actual.
 function pintarCodigo(paso = "") {
   const box = $("#ia-codigo");
