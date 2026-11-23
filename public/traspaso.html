@@ -149,7 +149,7 @@ ol.pasos li { margin-bottom: 4px; }
     </div>
     <div class="card no-print" id="card-sistema">
       <h2>2. Pasar al sistema</h2>
-      <p class="muted">Con lo calculado salen un <b>Excel con las cantidades para meter en el sistema</b> y una <b>hoja de traspaso</b> para preparar y firmar el envío. El Excel sale <b>igual que el pedido</b>: las mismas hojas (PRIORITARIOS, Picking, PALETS…), columnas y orden, con la cantidad ya en bases completas y su tipo (CJ, UD o KG). Las que no se pueden enviar en bases (en rojo: les falta un dato de la ficha) van con la <b>cantidad del pedido</b>, marcadas «VA LO PEDIDO».</p>
+      <p class="muted">Con lo calculado salen un <b>Excel con las cantidades para meter en el sistema</b> y una <b>hoja de traspaso</b> para preparar y firmar el envío. El Excel sale con el <b>mismo formato que el Excel con el detalle</b>: una hoja por cada hoja del pedido, lo pedido por <b>palets</b> en una hoja aparte, y solo las columnas Artículo, Descriptivo, Cajas pedidas (o Palets pedidos) y Cajas para el pedido (o Kilos, si eliges kilos). Las que no se pueden calcular en bases (en rojo: les falta un dato de la ficha) salen «Sin calcular» con el motivo; en la hoja de traspaso van con la <b>cantidad del pedido</b>.</p>
       <div class="mapeo">
         <div><label class="f" for="sel-destino">Almacén que pide</label><select id="sel-destino" style="width:100%"></select></div>
         <div><label class="f" for="in-npedido">Nº de pedido o referencia (opcional)</label><input type="text" id="in-npedido" autocomplete="off" style="width:100%"></div>
@@ -251,7 +251,7 @@ const idb = (() => {
 // Un nombre que es el propio código (p. ej. la columna Descripción apuntando a la del artículo) no vale como nombre
 const nombreValido = (d, ref) => { const t = String(d ?? "").trim(); return t && normArt(t) !== normArt(ref) ? t : ""; };
 // Cambia en cada versión: si dos equipos muestran otra, uno tiene la página antigua (hay que recargarla)
-const VERSION_PAGINA = "23-11-2026";
+const VERSION_PAGINA = "23-11-2026 b";
 let AJ = { codigo: "", responsable: false, zona: "08", tema: "" };
 // ficha: items[ref] = { kgCaja, cajasBase, basesPalet, desc, t, por }; ver = versión compartida;
 // pendientes[ref] = lo cambiado en este equipo que aún no ha llegado a la base compartida
@@ -928,24 +928,28 @@ function descargarExcel(hojas, nombre) {
   }
   XLSX.writeFile(wb, nombre);
 }
-// Excel con el detalle: solo lo importante. Una hoja por cada hoja del pedido (si solo hay una, «Cajas»),
-// y lo que se pide por palets siempre en una hoja aparte (la PALETS del pedido si la tiene, si no «Palets»).
-$("#btn-exportar").addEventListener("click", () => {
-  if (!FILAS.length) { toast("No hay ninguna referencia calculada"); return; }
+// Los dos Excel (con el detalle y para el sistema) salen igual: solo lo importante. Una hoja por cada hoja del pedido
+// (si solo hay una, «Cajas»), y lo que se pide por palets siempre en una hoja aparte (la PALETS del pedido si la tiene,
+// si no «Palets»). En kilos, la última columna son los kilos que salen en vez de las cajas.
+function hojasSimples(unidad = "CJ") {
+  const kilos = unidad === "KG";
+  const colPara = kilos ? "Kilos para el pedido" : "Cajas para el pedido";
   const hojas = hojasIncluidas().map((h) => h.nombre);
   const hojaPalets = hojas.find((n) => /palet|pallet/i.test(n)) || "Palets";
   const nombreHoja = (l) => (l.palPed > 0 ? hojaPalets : hojas.length > 1 ? l.hoja : "Cajas");
   // lo pedido: el número si solo se pidió en esa unidad; si viene mezclado (kg, unidades…), el texto
   const pedido = (l, n, soloEsto) => (soloEsto ? n : textoPedido(l));
-  const paraPedido = (l) => (l.cajas == null ? `Sin calcular: ${textoEstado(l).replace(/^./, (c) => c.toLowerCase())}` : l.bulto === "CJ" ? l.cajas : `${l.cajas} ${l.bulto}`);
+  const sinCalcular = (l) => `Sin calcular: ${(l.cajas != null && kilos ? "falta kg por caja" : textoEstado(l)).replace(/^./, (c) => c.toLowerCase())}`;
+  const paraPedido = (l) => kilos ? (l.kgEnv != null ? +l.kgEnv.toFixed(3) : sinCalcular(l))
+    : l.cajas == null ? sinCalcular(l) : l.bulto === "CJ" ? l.cajas : `${l.cajas} ${l.bulto}`;
   const grupos = new Map();
   for (const l of [...FILAS].sort((x, y) => x.orden - y.orden)) {
     const n = nombreHoja(l);
     if (!grupos.has(n)) grupos.set(n, []);
     const pal = l.palPed > 0;
     grupos.get(n).push(pal
-      ? { "Artículo": l.codigo, "Descriptivo": l.desc, "Palets pedidos": pedido(l, l.palPed, !l.kg && !l.cajasPed && !l.udPed), "Cajas para el pedido": paraPedido(l) }
-      : { "Artículo": l.codigo, "Descriptivo": l.desc, "Cajas pedidas": pedido(l, l.cajasPed, !l.kg && !l.udPed), "Cajas para el pedido": paraPedido(l) });
+      ? { "Artículo": l.codigo, "Descriptivo": l.desc, "Palets pedidos": pedido(l, l.palPed, !l.kg && !l.cajasPed && !l.udPed), [colPara]: paraPedido(l) }
+      : { "Artículo": l.codigo, "Descriptivo": l.desc, "Cajas pedidas": pedido(l, l.cajasPed, !l.kg && !l.udPed), [colPara]: paraPedido(l) });
   }
   // el orden de las hojas, como en el pedido; la de palets al final si no estaba
   const orden = [...new Set([...hojas.filter((n) => grupos.has(n)), ...grupos.keys()])];
@@ -956,7 +960,11 @@ $("#btn-exportar").addEventListener("click", () => {
     usados.add(x.toLowerCase());
     return x;
   };
-  descargarExcel(orden.map((n) => [limpio(n), grupos.get(n), null, [12, 50, 16, 20]]), `traspaso_bases${STOCK.zona ? "_" + STOCK.zona : ""}_${hoy()}.xlsx`);
+  return orden.map((n) => [limpio(n), grupos.get(n), null, [12, 50, 16, 20]]);
+}
+$("#btn-exportar").addEventListener("click", () => {
+  if (!FILAS.length) { toast("No hay ninguna referencia calculada"); return; }
+  descargarExcel(hojasSimples("CJ"), `traspaso_bases${STOCK.zona ? "_" + STOCK.zona : ""}_${hoy()}.xlsx`);
 });
 $("#btn-imprimir").addEventListener("click", () => window.print());
 $("#btn-plantilla").addEventListener("click", () => {
@@ -978,68 +986,15 @@ $("#btn-export-ficha").addEventListener("click", () => {
   descargarExcel([["Ficha de bases", filas, ["Referencia", "Descripción", "Cajas por base", "Bases por palet", "Kg por caja", "Origen", "Último cambio"]]], `ficha_bases_${hoy()}.xlsx`);
 });
 // ---------- pasar al sistema ----------
-// Las que no se pueden enviar en bases (les falta un dato de la ficha) no se quedan fuera: van con lo que se pidió
-const HOJA_PEDIDO = "Van como en el pedido";
+// En la hoja de traspaso, las que no se pueden enviar en bases (les falta un dato de la ficha) van con lo que se pidió
 const motivoPedido = (l) => (l.bases == null ? textoEstado(l) : "falta kg por caja").replace(/^./, (c) => c.toLowerCase());
-// El Excel para el sistema sale con las mismas hojas, columnas y orden que el pedido (PRIORITARIOS, Picking, PALETS…),
-// con la cantidad ya ajustada a bases completas y el tipo de cada una (CJ, UD o KG). Lo que no se ha podido calcular
-// se deja como venía y se marca en «Aviso».
 // descripción de un código: la de la ficha técnica; si no, la del stock del que envía o del que pide
 const descripcionDe = (ref) => (ref ? nombreValido(F.items[ref]?.desc, ref) || nombreValido(STOCK.porArt.get(ref)?.desc, ref) || nombreValido(STOCK_PIDE.porArt?.get(ref)?.desc, ref) : "");
-function hojasComoPedido(unidad) {
-  const usados = new Set(["Detalle", HOJA_PEDIDO, "Datos del traspaso"]);
-  return hojasIncluidas().map((hoja) => {
-    const m = mapeoDeHoja(hoja);
-    const porRef = new Map(FILAS.filter((l) => l.hoja === hoja.nombre).map((l) => [l.ref, l]));
-    const ancho = Math.max(hoja.cab.length, ...hoja.filas.map((f) => f.length));
-    const cab = Array.from({ length: ancho }, (_, i) => hoja.cab[i] ?? "");
-    // la descripción va al lado del artículo; si el pedido ya trae columna de descripción, se rellena la suya
-    const conDesc = "descripcion" in m && m.descripcion !== m.articulo, junto = "articulo" in m ? m.articulo + 1 : 0;
-    const conDescripcion = (f, ref, l) => {
-      const d = (l?.desc || descripcionDe(ref)) ?? "";
-      if (conDesc) { if (!String(f[m.descripcion] ?? "").trim()) f[m.descripcion] = d; return f; }
-      return [...f.slice(0, junto), d, ...f.slice(junto)];
-    };
-    const filas = [[...conDescripcion([...cab], "", { desc: "Descripción" }), "Bases", "Cajas por base", "Pedido original", "Aviso"]];
-    const vistas = new Set();
-    for (const fila of hoja.filas) {
-      if (!fila.some((v) => String(v ?? "").trim())) continue;
-      const f = Array.from({ length: ancho }, (_, i) => fila[i] ?? "");
-      const ref = "articulo" in m ? normArt(fila[m.articulo]) : "";
-      const l = ref ? porRef.get(ref) : null;
-      if (!l) { filas.push([...conDescripcion(f, ref), "", "", "", ref ? "No se ha calculado: revisa la cantidad o la unidad" : ""]); continue; }
-      if (vistas.has(ref)) { filas.push([...conDescripcion(f, ref, l), "", "", "", "Repetida en esta hoja: su cantidad va sumada en la primera fila"]); continue; }
-      vistas.add(ref);
-      const q = l.bases != null ? cantidadSistema(l, unidad) : null;
-      // no se puede en bases completas: va la cantidad del pedido, tal cual
-      if (q == null) { filas.push([...conDescripcion(f, ref, l), "", l.cajasBase ?? "", textoPedido(l), `VA LO PEDIDO: ${motivoPedido(l)}`]); continue; }
-      const tipo = unidad === "CJ" ? l.bulto : "KG";
-      if ("cantidad" in m) {
-        if ("unidad" in m) { f[m.cantidad] = q; f[m.unidad] = tipo; }
-        else f[m.cantidad] = leerCantidad(fila[m.cantidad]).texto ? `${q} ${tipo}` : q;
-      } else {
-        if ("cajas" in m) f[m.cajas] = unidad === "CJ" ? q : "";
-        if ("kilos" in m) f[m.kilos] = unidad === "KG" ? q : "";
-      }
-      filas.push([...conDescripcion(f, ref, l), l.bases, l.cajasBase, textoPedido(l), l.problemas.join(" · ")]);
-    }
-    // nombre de hoja válido para Excel (máx. 31 caracteres, sin repetir)
-    let nombre = String(hoja.nombre).replace(/[\\/?*[\]:]/g, " ").slice(0, 31) || "Pedido";
-    for (let i = 2; usados.has(nombre); i++) nombre = `${String(hoja.nombre).slice(0, 27)} (${i})`;
-    usados.add(nombre);
-    return [nombre, filas];
-  });
-}
 const nombreAlm = (z) => ALMACENES[z] || (z ? `Almacén ${z}` : "");
 const listas = () => FILAS.filter((l) => l.bases != null);
 const pendientes = () => FILAS.filter((l) => l.bases == null);
 function datosSistema() {
   return { origen: STOCK.zona, destino: $("#sel-destino").value, npedido: $("#in-npedido").value.trim(), unidad: $("#sel-unidad-sis").value };
-}
-// Lo que va al sistema de cada referencia: cajas que salen, o sus kilos (aproximados si es de peso variable)
-function cantidadSistema(l, unidad) {
-  if (unidad === "CJ") return l.cajas;
-  return l.kgEnv != null ? +l.kgEnv.toFixed(3) : null;
 }
 function pintarSistema() {
   if (!PEDIDO) return;
@@ -1050,9 +1005,9 @@ function pintarSistema() {
   const sinStock = ok.filter((l) => l.problemas.length).length;
   const avisos = [
     origen === destino ? "El almacén que pide es el mismo que el que envía." : "",
-    pend.length ? `${pend.length} ${pend.length === 1 ? "referencia no se puede enviar en bases: va" : "referencias no se pueden enviar en bases: van"} con la cantidad del pedido (en rojo en la tabla; si les pones las cajas por base, pasan a ir en bases).` : "",
+    pend.length ? `${pend.length} ${pend.length === 1 ? "referencia no se puede calcular en bases: sale" : "referencias no se pueden calcular en bases: salen"} «Sin calcular» en el Excel y con la cantidad del pedido en la hoja de traspaso (en rojo en la tabla; si les pones las cajas por base, pasan a ir en bases).` : "",
     sinStock ? `${sinStock} ${sinStock === 1 ? "referencia va" : "referencias van"} aunque no haya stock suficiente: revísalas antes de grabar.` : "",
-    sinKg ? `${sinKg} sin kg por caja: en kilos van con lo pedido; en cajas sí van en bases.` : "",
+    sinKg ? `${sinKg} sin kg por caja: en kilos salen «Sin calcular»; en cajas sí van en bases.` : "",
     variables ? `${variables} de peso variable: sus kilos son aproximados (media del stock). Mejor meterlas en cajas.` : "",
   ].filter(Boolean);
   $("#sistema-aviso").innerHTML = avisos.length ? `<div class="status" style="margin-top:10px">${avisos.map(esc).join("<br>")}</div>` : "";
@@ -1064,27 +1019,12 @@ const nombreArchivo = (base) => {
   return `${base}_${origen}_a_${destino}_${hoy()}${np ? "_" + np : ""}.xlsx`;
 };
 $("#btn-sistema").addEventListener("click", () => {
-  const { origen, destino, npedido, unidad } = datosSistema();
-  const ok = listas().filter((l) => cantidadSistema(l, unidad) != null);
+  const { unidad } = datosSistema();
   if (!FILAS.length) { toast("No hay ninguna referencia para pasar al sistema"); return; }
-  const enBases = new Set(ok);
-  const detalle = FILAS.map((l) => enBases.has(l) ? {
-    ...(PEDIDO.hojas.length > 1 ? { "Hoja": l.hoja } : {}),
-    "Material": l.codigo, "Descripción material": l.desc, "Pedido": textoPedido(l), "Cajas por base": l.cajasBase,
-    "Bases": l.bases, "Cajas": l.cajas, "Bulto": l.bulto, "Kg": l.kgEnv != null ? +l.kgEnv.toFixed(3) : "", "Palets": textoPalets(l.palets), "Aviso": l.problemas.join(" · "),
-  } : {
-    ...(PEDIDO.hojas.length > 1 ? { "Hoja": l.hoja } : {}),
-    "Material": l.codigo, "Descripción material": l.desc, "Pedido": textoPedido(l), "Cajas por base": l.cajasBase ?? "",
-    "Bases": "", "Cajas": "", "Bulto": "", "Kg": "", "Palets": "", "Aviso": `Va lo pedido: ${motivoPedido(l)}`,
-  });
-  const fuera = FILAS.filter((l) => !enBases.has(l)).map((l) => ({
-    ...(PEDIDO.hojas.length > 1 ? { "Hoja": l.hoja } : {}),
-    "Material": l.codigo, "Descripción material": l.desc, "Va (lo pedido)": textoPedido(l), "Por qué no va en bases": motivoPedido(l).replace(/^./, (c) => c.toUpperCase()),
-  }));
-  const datos = [["Sale de", nombreAlm(origen)], ["Va a", nombreAlm(destino)], ...(npedido ? [["Nº pedido", npedido]] : []), ["Fecha", new Date().toLocaleDateString("es-ES")],
-    ["Cantidad en", unidad === "CJ" ? "Cajas (CJ, o UD si el artículo se mueve por unidad)" : "Kilos (KG)"]];
-  descargarExcel([...hojasComoPedido(unidad), ["Detalle", detalle], ...(fuera.length ? [[HOJA_PEDIDO, fuera]] : []), ["Datos del traspaso", datos]], nombreArchivo("traspaso_sistema"));
-  toast(`Excel para el sistema: ${hojasIncluidas().length} ${hojasIncluidas().length === 1 ? "hoja" : "hojas"} como el pedido, ${ok.length} en bases (${unidad === "CJ" ? "cajas" : "kilos"})${FILAS.length > ok.length ? ` y ${FILAS.length - ok.length} con lo pedido` : ""}`);
+  const hojas = hojasSimples(unidad);
+  const sinCalc = FILAS.filter((l) => (unidad === "KG" ? l.kgEnv == null : l.cajas == null)).length;
+  descargarExcel(hojas, nombreArchivo("traspaso_sistema"));
+  toast(`Excel para el sistema: ${hojas.length} ${hojas.length === 1 ? "hoja" : "hojas"}, en ${unidad === "CJ" ? "cajas" : "kilos"}${sinCalc ? ` · ${sinCalc} sin calcular` : ""}`);
 });
 $("#btn-hoja").addEventListener("click", () => {
   const { origen, destino, npedido } = datosSistema();
