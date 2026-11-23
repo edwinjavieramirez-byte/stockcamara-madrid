@@ -5,7 +5,7 @@ App web para móvil (Chrome Android) que:
 1. Carga los Excel de **stock**, **maestro de picking** y **ubicaciones vacías** (se guardan solo en el móvil).
 2. **Escanea** la etiqueta de una caja con una foto y te dice qué artículo es, cuál es su picking y cuántas cajas hay en stock: en picking, en reserva y en qué ubicaciones.
 3. **Descargas:** carga el PDF del listado de pedidos de compras del día y te dice en qué picking va cada artículo, para imprimirlo.
-4. Saca un **informe**: cajas fuera de su picking y adónde llevarlas, pickings mezclados, pickings sin su artículo (con palets de reserva para reponer) y stock caducado (situación 505).
+4. Saca un **informe**: cajas fuera de su picking y adónde llevarlas, pickings mezclados, y pickings sin su artículo (con palets de reserva para reponer).
 
 La antigua pestaña **Movimientos** (anotar movimientos desde el móvil para el responsable) se ha quitado porque ya no se usa.
 
@@ -67,13 +67,14 @@ Pestaña **Descargas**, para todos.
 3. **Imprimir** saca el documento en A4 (también se puede guardar como PDF). En el móvil, la pantalla solo enseña las columnas principales; al imprimir salen todas.
 4. **Excel** saca lo mismo en una hoja.
 
-- El listado se queda guardado en ese dispositivo hasta que cargues otro o pulses **Quitar el listado**.
+- **Comprobación:** en cada pedido, las unidades de los artículos tienen que sumar su «TOTAL PEDIDO». Si no cuadran, o si hay artículos sin una cabecera de PROVEEDOR delante, el pedido sale con un aviso naranja para revisarlo en el original, y nunca se mezcla con el del proveedor anterior. Los códigos de proveedor pueden llevar letras (p. ej. W999).
+- El listado se queda guardado en ese dispositivo hasta que cargues otro o pulses **Quitar el listado**. Un listado cargado con una versión anterior de la app hay que volver a cargarlo para que se lea con la nueva.
 - Si cambias de almacén, el picking se busca en el maestro del almacén nuevo.
 
 ## Stock caducado (situación 505)
 
 - La situación **505** del Excel de stock es **caducado**. Si el Excel trae además una columna con el texto de la situación o una columna «Caducado», al cargarlo se puede indicar como «Descripción situación / Caducado».
-- Sale en rojo al escanear, en **Informe → Stock caducado (505)** (con su exportación a Excel) y en las sugerencias de reposición.
+- No tiene apartado propio en el Informe: la app lo tiene en cuenta y avisa en rojo cuando se encuentra con él, al escanear (en el total y en su ubicación) y en las sugerencias de reposición.
 
 ## Pickings con más de un artículo
 
@@ -118,7 +119,7 @@ Página `public/traspaso.html` (en la app: pestaña **Traspaso**, o **Datos → 
    - **Excel para el sistema:** sale **igual que el pedido**: las mismas hojas (PRIORITARIOS, Picking, PALETS…), con sus columnas y en el mismo orden, pero con la cantidad ya ajustada a bases completas y el tipo de cada línea (CJ, o UD si el artículo se mueve por unidad; KG si se elige en kilos). Al lado del artículo se añade la **Descripción** (si el pedido ya trae esa columna, se rellena la suya) y a la derecha Bases, Cajas por base, Pedido original y Aviso. La descripción sale de la ficha técnica (cadena logística); si el artículo no está en ella, del Excel de stock de Barcelona o de Madrid. Las referencias que **no se pueden enviar en bases** (les falta un dato de la ficha, p. ej. cajas por base) no se quedan fuera: van con la **cantidad del pedido**, tal cual, marcadas «VA LO PEDIDO» con el motivo. Detrás van la hoja «Detalle» con bases y cajas; hoja «Van como en el pedido» con esas referencias y el motivo, y «Datos del traspaso» (almacenes, nº de pedido, fecha). Si una referencia sale en dos hojas del pedido, se calcula en cada una por separado.
    - **Hoja de traspaso:** documento para imprimir o guardar en PDF, con las bases y cajas de cada material, casilla de «Preparado» y firmas, agrupado por hoja del pedido. Las que van con lo pedido salen en naranja con su cantidad original.
    - En cuanto se completan las cajas por base de una de esas referencias, pasa a ir en bases. En kilos, los de peso variable son aproximados: mejor en cajas.
-6. **Excel con el detalle** o **Imprimir** sacan la tabla completa.
+6. **Excel con el detalle:** solo cuatro columnas, **Artículo**, **Descriptivo**, **Cajas pedidas** y **Cajas para el pedido**. Va una hoja por cada hoja del pedido (si el pedido tiene una sola, se llama «Cajas») y lo que se pide **por palets** va siempre en una hoja aparte: la PALETS del pedido si la tiene, y si no, «Palets», con la columna **Palets pedidos** en lugar de Cajas pedidas. Si lo pedido viene en kilos o mezclado, la columna de lo pedido lo dice en texto («150 kg»). Si una referencia no se puede calcular, en Cajas para el pedido sale «Sin calcular» con el motivo. **Imprimir** saca la tabla completa.
 
 - **Solo el responsable:** la pestaña **Traspaso** solo aparece con el código de responsable. Si otro móvil abre el enlace, la página sale bloqueada, y el servidor solo da y guarda la ficha con ese código. La ficha es común a todos los almacenes (Netlify Blobs). Cada cambio se guarda referencia a referencia, así que importar una ficha no borra lo que ya había de otras referencias.
 - **Dónde están los datos:** el Excel del pedido no sale del equipo; solo se comparte la ficha.

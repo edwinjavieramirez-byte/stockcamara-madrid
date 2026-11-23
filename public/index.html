@@ -175,6 +175,7 @@ mark { background: #fde047; color: #14212b; border-radius: 2px; }
 .ped-cab { display: flex; flex-wrap: wrap; gap: 2px 16px; align-items: baseline; padding: 9px 12px; background: var(--chip); font-size: 13px; }
 .ped-cab b { font-size: 15px; margin-right: auto; }
 .ped-cab span { color: var(--muted); white-space: nowrap; }
+.ped-aviso { padding: 7px 12px; background: var(--warn-bg); color: var(--warn); font-size: 13px; font-weight: 600; }
 .ped-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .ped-tbl th { text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .3px; padding: 6px; }
 .ped-tbl td { padding: 6px; border-top: 1px solid var(--line); vertical-align: top; }
@@ -198,6 +199,7 @@ mark { background: #fde047; color: #14212b; border-radius: 2px; }
   .ped-tbl .cod { font-size: 8.5pt; }
   .ped-pk { font-size: 10.5pt; }
   .ped-sin { border: 1px solid #000; }
+  .ped-aviso { border: 1px solid #000; padding: 3px 6px; font-size: 8.5pt; }
 }
 /* ubicaciones libres: casillas como en la hoja impresa */
 .libre-tag { display: inline-block; background: #ffd23f; color: #14212b; font: 700 12px ui-monospace, "SF Mono", Menlo, Consolas, monospace; padding: 3px 8px; letter-spacing: .05em; }
@@ -309,9 +311,6 @@ mark { background: #fde047; color: #14212b; border-radius: 2px; }
     </div>
     <div class="card"><h2>Movimientos a hacer</h2><p class="muted">Cajas en un picking que no es el suyo y adónde deben ir.</p><div id="inf-mov"></div></div>
     <div class="card"><h2>Pickings con problemas</h2><p class="muted">Ubicaciones de picking con varios artículos o con un artículo que no les corresponde.</p><div id="inf-mezcla"></div></div>
-    <div class="card"><h2>Stock caducado (505)</h2><p class="muted">UA con situación 505 en el Excel de stock.</p>
-      <div class="row" style="margin-bottom:6px"><button class="btn small" id="btn-export-cad">⬇️ Exportar caducados a Excel</button></div>
-      <div id="inf-cad"></div></div>
     <div class="card"><h2>Pickings sin su artículo</h2><p class="muted">Pickings asignados donde no hay stock de su artículo, y dónde hay palets para reponer.</p><div id="inf-vacios"></div></div>
   </section>
 
@@ -1101,10 +1100,9 @@ function buscar(q) {
 }
 
 // ---------- informe ----------
-let MOVS = [], CADUCADOS = [];
+let MOVS = [];
 function calcularInforme() {
-  const mov = [], mezcla = [], vacios = [], caducados = [];
-  for (const filas of IDX.stockPorUbi.values()) for (const f of filas) if (caducado(f)) caducados.push(f);
+  const mov = [], mezcla = [], vacios = [];
   for (const [u, filas] of IDX.stockPorUbi) {
     if (!esPicking(verUbi(u))) continue;
     const arts = [...new Set(filas.map((f) => f.k))];
@@ -1140,8 +1138,7 @@ function calcularInforme() {
   mov.sort((x, y) => normUbi(x.desde).localeCompare(normUbi(y.desde)));
   mezcla.sort((x, y) => x.u.localeCompare(y.u));
   vacios.sort((x, y) => x.u.localeCompare(y.u));
-  caducados.sort((x, y) => x.u.localeCompare(y.u) || x.k.localeCompare(y.k));
-  return { mov, mezcla, vacios, caducados };
+  return { mov, mezcla, vacios };
 }
 const nomArt = (k) => { const a = IDX.articulos.get(k); return a ? `${a.articulo} ${a.descripcion}` : k; };
 const LIM = 300;
@@ -1321,18 +1318,17 @@ function pintarBase() {
   $("#btn-compartir")?.addEventListener("click", async () => { await subirBase(faltan); if (!BASE.error) toast("Compartido con todos los dispositivos"); });
 }
 function pintarInforme() {
-  const { mov, mezcla, vacios, caducados } = calcularInforme();
-  CADUCADOS = caducados;
+  const { mov, mezcla, vacios } = calcularInforme();
   MOVS = mov;
   const f = norm($("#filtro-informe").value);
   const pasa = (...t) => !f || t.some((x) => norm(x).includes(f));
   const hayStock = IDX.articulos.size && S.stock;
 
   $("#tiles").innerHTML = [
-    [mov.length, "movimientos a hacer"], [mezcla.length, "pickings con problemas"], [vacios.length, "pickings sin su artículo"], [caducados.length, "UA caducadas (505)"],
+    [mov.length, "movimientos a hacer"], [mezcla.length, "pickings con problemas"], [vacios.length, "pickings sin su artículo"],
   ].map(([n, t]) => `<div class="tile"><b>${n}</b><span>${t}</span></div>`).join("");
 
-  if (!hayStock) { ["#inf-mov", "#inf-mezcla", "#inf-vacios", "#inf-cad"].forEach((s) => ($(s).innerHTML = `<p class="muted">Carga el Excel de stock.</p>`)); return; }
+  if (!hayStock) { ["#inf-mov", "#inf-mezcla", "#inf-vacios"].forEach((s) => ($(s).innerHTML = `<p class="muted">Carga el Excel de stock.</p>`)); return; }
   const sinMaestro = !IDX.hayMaestro ? `<p class="muted">⚠️ Sin maestro de picking solo puedo detectar mezclas de artículos, no adónde va cada uno.</p>` : "";
 
   const m1 = mov.filter((m) => pasa(m.desde, m.destino, m.f.articulo, m.f.descripcion, m.f.ua));
@@ -1346,12 +1342,6 @@ function pintarInforme() {
       <div><b>${esc(verUbi(m.u))}</b> ${m.arts.length > 1 ? `<span class="badge bad">${m.arts.length} artículos</span>` : ""} ${m.intrusos.length ? `<span class="badge warn">${m.intrusos.length} fuera de sitio</span>` : ""}</div>
       <div class="muted">Asignado: ${m.asign ? esc(nomArt(m.asign)) : "— sin asignar en el maestro —"}</div>
       <div>${m.arts.map((k) => `${m.intrusos.includes(k) ? "❌" : "✅"} ${esc(nomArt(k))}`).join("<br>")}</div></li>`).join("")}</ul>` : `<p class="muted">Ningún picking mezclado 👍</p>`;
-
-  const m4 = caducados.filter((f) => pasa(f.ubicacion, f.articulo, f.descripcion, f.lote, f.ua));
-  $("#inf-cad").innerHTML = m4.length ? `<p class="muted">${m4.length} UA · ${nCajas(m4.reduce((n, f) => n + cajasDe(f), 0))}</p><ul class="list">${m4.slice(0, LIM).map((f) => `<li>
-      <div><b>${esc(f.ubicacion)}</b> <span class="badge ${esPicking(f.ubicacion) ? "ok" : ""}">${esPicking(f.ubicacion) ? "Picking" : esPlaya(f.ubicacion) ? "Playa" : "Reserva"}</span> <span class="badge bad">${esc(f.situacion || "505")} caducado</span></div>
-      <div>${esc(f.articulo)} · ${esc(f.descripcion)}</div>
-      <div class="muted mono">UA ${esc(f.ua)} · lote ${esc(f.lote)} · cad. ${esc(verFecha(f.cad))} · ${esc(f.cajas)} cajas</div></li>`).join("")}</ul>${m4.length > LIM ? `<p class="muted">Mostrando ${LIM} de ${m4.length}. Exporta a Excel para verlos todos.</p>` : ""}` : `<p class="muted">No hay stock caducado 👍</p>`;
 
   const m3 = vacios.filter((v) => pasa(verUbi(v.u), nomArt(v.k)));
   $("#inf-vacios").innerHTML = IDX.hayMaestro ? (m3.length ? `<ul class="list">${m3.slice(0, LIM).map((v) => `<li>
@@ -1885,7 +1875,8 @@ function leerListado(lineas) {
     if (/^ORGANIZACI[OÓ]N COMPRAS/i.test(t)) { L.organizacion ||= t.replace(/^ORGANIZACI[OÓ]N COMPRAS\s*/i, "").trim(); art = null; continue; }
     if ((m = t.match(/^TOTAL POR ORGANIZACI[OÓ]N:?\s*(\S+)?/i))) { L.totalOrg = m[1] || ""; art = null; continue; }
     if ((m = t.match(/^TOTAL GENERAL:?\s*(\S+)?/i))) { L.totalGeneral = m[1] || ""; art = null; continue; }
-    if ((m = t.match(/^PROVEEDOR\s*(\d+)\s+(.*)$/i))) {
+    // el código de proveedor puede llevar letras (p. ej. W999 SARL LA FAMILLE BOUTRAIS)
+    if ((m = t.match(/^PROVEEDOR\s*([A-Z0-9]+)\s+(.*)$/i))) {
       const resto = m[2];
       const g = (rx) => (resto.match(rx) || [])[1]?.trim() || "";
       ped = {
@@ -1901,7 +1892,13 @@ function leerListado(lineas) {
       art = null; continue;
     }
     // artículo: código (6 cifras y a veces una letra), descripción, fecha de entrega y las cifras
-    if (ped && (m = t.match(/^(?:\S{1,3}\s+)??(\d{5,7}[A-Z]?)\s+(.*?)\s*(\d{2}\/\d{2}\/\d{4})\s+(.*)$/)) && /\d,\d/.test(m[4])) {
+    if ((m = t.match(/^(?:\S{1,3}\s+)??([A-Z]?\d{5,7}[A-Z]?)\s+(.*?)\s*(\d{2}\/\d{2}\/\d{4})\s+(.*)$/)) && /\d,\d/.test(m[4])) {
+      // un artículo sin cabecera de proveedor delante (o detrás del TOTAL PEDIDO del anterior) no se mete en
+      // otro pedido: va en uno aparte, avisando, para que no se mezcle con el de otro proveedor
+      if (!ped || ped.total) {
+        ped = { prov: "", nombre: "", pedido: "", ref: "", fecha: "", divisa: "", lineas: [], total: null, sinCabecera: true };
+        L.pedidos.push(ped);
+      }
       const tok = m[4].replace(/(\d)([A-Za-z]{1,3})(?=\s|$)/g, "$1 $2").split(" ").filter(Boolean);
       const pedidas = tok.shift() || "";
       const unidad = tok[0] && !RX_NUM.test(tok[0]) ? tok.shift() : "";
@@ -1919,6 +1916,13 @@ function leerListado(lineas) {
     }
   }
   L.pedidos = L.pedidos.filter((p) => p.lineas.length);
+  // comprobación: las unidades de los artículos tienen que sumar el TOTAL PEDIDO del listado
+  for (const p of L.pedidos) {
+    const suma = p.lineas.reduce((n, l) => n + cantidad(l.pedidas), 0);
+    if (p.sinCabecera) p.aviso = "No he podido leer el proveedor de este pedido. Revísalo en el listado original.";
+    else if (!p.total) p.aviso = "El listado no trae el total de este pedido. Revísalo en el original.";
+    else if (Math.abs(suma - cantidad(p.total.pedidas)) > 0.01) p.aviso = `Las unidades de los artículos (${fmtCant(suma)}) no suman el total del pedido (${p.total.pedidas}). Revísalo en el listado original.`;
+  }
   return L;
 }
 const pickingsDe = (cod) => IDX.pickingDeArt.get(normArt(cod)) || [];
@@ -1945,8 +1949,9 @@ function pintarDescargas() {
   if (!PED) { $("#ped-tiles").innerHTML = ""; doc.innerHTML = ""; return; }
   const lineas = PED.pedidos.flatMap((p) => p.lineas);
   const sinPk = lineas.filter((l) => !pickingsDe(l.art).length).length;
-  const provs = new Set(PED.pedidos.map((p) => p.prov)).size;
-  $("#ped-tiles").innerHTML = [[provs, "proveedores"], [PED.pedidos.length, "pedidos"], [lineas.length, "artículos"], [sinPk, "sin picking asignado"]]
+  const provs = new Set(PED.pedidos.map((p) => p.prov).filter(Boolean)).size;
+  const conAviso = PED.pedidos.filter((p) => p.aviso).length;
+  $("#ped-tiles").innerHTML = [[provs, "proveedores"], [PED.pedidos.length, "pedidos"], [lineas.length, "artículos"], [sinPk, "sin picking asignado"], ...(conAviso ? [[conAviso, "pedidos para revisar"]] : [])]
     .map(([n, t]) => `<div class="tile"><b>${n}</b><span>${t}</span></div>`).join("");
   const sinMaestro = !IDX.hayMaestro ? `<div class="card noprint"><p class="muted" style="margin:0">⚠️ No hay maestro de picking cargado para ${esc(nombreAlmacen(S.ajustes.zona))}: no puedo decir el picking de ningún artículo.</p></div>` : "";
   const celdaPk = (cod) => { const pk = pickingsDe(cod); return pk.length ? pk.map((u) => `<div class="ped-pk">${esc(u)}</div>`).join("") : `<span class="ped-sin">SIN PICKING</span>`; };
@@ -1954,7 +1959,8 @@ function pintarDescargas() {
   doc.innerHTML = `${sinMaestro}<div class="ped-titulo"><h2>LISTADO PEDIDOS DE COMPRAS · UBICACIÓN DE PICKING</h2>
     <p>${esc(nombreAlmacen(S.ajustes.zona))}${PED.organizacion ? ` · ${esc(PED.organizacion)}` : ""}${PED.fechaListado ? ` · listado del ${esc(PED.fechaListado)}` : ""} · impreso el ${esc(ahora)}</p></div>
     ${PED.pedidos.map((p) => `<div class="ped">
-      <div class="ped-cab"><b>PROVEEDOR ${esc(p.prov)} ${esc(p.nombre)}</b><span>Serie/pedido ${esc(p.pedido)}</span>${p.ref ? `<span>Ref. ${esc(p.ref)}</span>` : ""}${p.fecha ? `<span>Fecha ${esc(p.fecha)}</span>` : ""}${p.divisa ? `<span class="imp">Divisa ${esc(p.divisa)}</span>` : ""}</div>
+      <div class="ped-cab"><b>${p.sinCabecera ? "PROVEEDOR SIN LEER" : `PROVEEDOR ${esc(p.prov)} ${esc(p.nombre)}`}</b><span>Serie/pedido ${esc(p.pedido)}</span>${p.ref ? `<span>Ref. ${esc(p.ref)}</span>` : ""}${p.fecha ? `<span>Fecha ${esc(p.fecha)}</span>` : ""}${p.divisa ? `<span class="imp">Divisa ${esc(p.divisa)}</span>` : ""}</div>
+      ${p.aviso ? `<div class="ped-aviso">⚠️ ${esc(p.aviso)}</div>` : ""}
       <table class="ped-tbl"><thead><tr><th>Artículo</th><th>Descripción</th><th class="imp">Entrega</th><th class="num">Ud. pedidas</th><th class="num imp">Ud. pdtes.</th><th class="num imp">Precio</th><th class="num imp">% Dto</th><th class="num imp">Pr. neto</th><th class="num imp">Importe</th><th>Picking</th></tr></thead>
       <tbody>${p.lineas.map((l) => `<tr><td class="cod">${esc(l.art)}</td><td>${esc(l.desc)}</td><td class="imp">${esc(l.entrega)}</td><td class="num">${esc(l.pedidas)} ${esc(l.unidad)}</td><td class="num imp">${esc(l.pdtes)}</td><td class="num imp">${esc(l.precio)}</td><td class="num imp">${esc(l.dto)}</td><td class="num imp">${esc(l.neto)}</td><td class="num imp">${esc(l.importe)}</td><td>${celdaPk(l.art)}</td></tr>`).join("")}</tbody>
       ${p.total ? `<tfoot><tr><td></td><td>TOTAL PEDIDO</td><td class="imp"></td><td class="num">${esc(p.total.pedidas)}</td><td class="num imp">${esc(p.total.pdtes)}</td><td class="imp" colspan="3"></td><td class="num imp">${esc(p.total.importe)}</td><td></td></tr></tfoot>` : ""}</table>
@@ -2032,11 +2038,6 @@ $("#tab-pickings").addEventListener("click", async (e) => {
   await guardar("pickHechos"); pintarPickings();
 });
 $("#btn-export-mov").addEventListener("click", exportarMovimientos);
-$("#btn-export-cad").addEventListener("click", () => {
-  if (!CADUCADOS.length) return toast("No hay stock caducado");
-  descargarExcel(CADUCADOS.map((f) => ({ "Ubicación": f.ubicacion, "Tipo": esPicking(f.ubicacion) ? "Picking" : esPlaya(f.ubicacion) ? "Playa" : "Reserva", "Artículo": f.articulo, "Descriptivo": f.descripcion, "UA": f.ua, "Lote": f.lote, "Caducidad": verFecha(f.cad), "Cajas": f.cajas, "Situación": f.situacion })),
-    "Caducado", `stock_caducado_${S.ajustes.zona}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-});
 $("#btn-export-maestro").addEventListener("click", () => {
   const filas = [...IDX.asignadosDeUbi].flatMap(([u, ks]) => [...ks].map((k) => [u, k])).map(([u, k]) => ({ "Artículo": IDX.articulos.get(k)?.articulo || k, "Descriptivo": IDX.articulos.get(k)?.descripcion || "", "Ubicación picking": verUbi(u) }));
   if (!filas.length) return toast("No hay maestro");

@@ -251,7 +251,7 @@ const idb = (() => {
 // Un nombre que es el propio código (p. ej. la columna Descripción apuntando a la del artículo) no vale como nombre
 const nombreValido = (d, ref) => { const t = String(d ?? "").trim(); return t && normArt(t) !== normArt(ref) ? t : ""; };
 // Cambia en cada versión: si dos equipos muestran otra, uno tiene la página antigua (hay que recargarla)
-const VERSION_PAGINA = "7-11-2026 c";
+const VERSION_PAGINA = "23-11-2026";
 let AJ = { codigo: "", responsable: false, zona: "08", tema: "" };
 // ficha: items[ref] = { kgCaja, cajasBase, basesPalet, desc, t, por }; ver = versión compartida;
 // pendientes[ref] = lo cambiado en este equipo que aún no ha llegado a la base compartida
@@ -921,24 +921,42 @@ function pintarImport() {
 // ---------- exportar ----------
 function descargarExcel(hojas, nombre) {
   const wb = XLSX.utils.book_new();
-  for (const [hoja, filas, cab] of hojas) {
+  for (const [hoja, filas, cab, anchos] of hojas) {
     const ws = Array.isArray(filas[0]) ? XLSX.utils.aoa_to_sheet(filas) : XLSX.utils.json_to_sheet(filas, cab ? { header: cab } : undefined);
+    if (anchos) ws["!cols"] = anchos.map((wch) => ({ wch }));
     XLSX.utils.book_append_sheet(wb, ws, hoja);
   }
   XLSX.writeFile(wb, nombre);
 }
+// Excel con el detalle: solo lo importante. Una hoja por cada hoja del pedido (si solo hay una, «Cajas»),
+// y lo que se pide por palets siempre en una hoja aparte (la PALETS del pedido si la tiene, si no «Palets»).
 $("#btn-exportar").addEventListener("click", () => {
-  const filas = FILAS.map((l) => ({
-    ...(PEDIDO.hojas.length > 1 ? { "Hoja": l.hoja } : {}),
-    "Referencia": l.codigo, "Descripción": l.desc, "Kg pedidos": l.kg ? +l.kg.toFixed(3) : "", "Cajas pedidas": l.cajasPed || "",
-    "Unidades pedidas": l.udPed || "", "Palets pedidos": l.palPed || "", "Bulto": l.bulto, "Unidades por caja": l.udCaja ?? "",
-    "Kg por caja": l.kgCaja ?? "", "Cajas por base": l.cajasBase ?? "", "Bases por palet": l.basesPalet ?? "",
-    "Cajas necesarias": l.cajasNec ?? "", "Bases a enviar": l.bases ?? "", "Cajas que salen": l.cajas ?? "", "Kg que salen": l.kgEnv != null ? +l.kgEnv.toFixed(3) : "",
-    "Cajas de más": l.excesoCajas ?? "", "Kg de más": l.excesoKg != null ? +l.excesoKg.toFixed(3) : "", "Palets": textoPalets(l.palets),
-    ...(conStock() ? { "Stock disponible (cajas)": l.st ? l.st.disp : 0 } : {}),
-    "Estado": textoEstado(l),
-  }));
-  descargarExcel([["Traspaso por bases", filas]], `traspaso_bases${STOCK.zona ? "_" + STOCK.zona : ""}_${hoy()}.xlsx`);
+  if (!FILAS.length) { toast("No hay ninguna referencia calculada"); return; }
+  const hojas = hojasIncluidas().map((h) => h.nombre);
+  const hojaPalets = hojas.find((n) => /palet|pallet/i.test(n)) || "Palets";
+  const nombreHoja = (l) => (l.palPed > 0 ? hojaPalets : hojas.length > 1 ? l.hoja : "Cajas");
+  // lo pedido: el número si solo se pidió en esa unidad; si viene mezclado (kg, unidades…), el texto
+  const pedido = (l, n, soloEsto) => (soloEsto ? n : textoPedido(l));
+  const paraPedido = (l) => (l.cajas == null ? `Sin calcular: ${textoEstado(l).replace(/^./, (c) => c.toLowerCase())}` : l.bulto === "CJ" ? l.cajas : `${l.cajas} ${l.bulto}`);
+  const grupos = new Map();
+  for (const l of [...FILAS].sort((x, y) => x.orden - y.orden)) {
+    const n = nombreHoja(l);
+    if (!grupos.has(n)) grupos.set(n, []);
+    const pal = l.palPed > 0;
+    grupos.get(n).push(pal
+      ? { "Artículo": l.codigo, "Descriptivo": l.desc, "Palets pedidos": pedido(l, l.palPed, !l.kg && !l.cajasPed && !l.udPed), "Cajas para el pedido": paraPedido(l) }
+      : { "Artículo": l.codigo, "Descriptivo": l.desc, "Cajas pedidas": pedido(l, l.cajasPed, !l.kg && !l.udPed), "Cajas para el pedido": paraPedido(l) });
+  }
+  // el orden de las hojas, como en el pedido; la de palets al final si no estaba
+  const orden = [...new Set([...hojas.filter((n) => grupos.has(n)), ...grupos.keys()])];
+  const usados = new Set();
+  const limpio = (n) => {
+    let x = String(n).replace(/[\\/?*[\]:]/g, " ").slice(0, 31) || "Pedido";
+    for (let i = 2; usados.has(x.toLowerCase()); i++) x = `${String(n).slice(0, 27)} (${i})`;
+    usados.add(x.toLowerCase());
+    return x;
+  };
+  descargarExcel(orden.map((n) => [limpio(n), grupos.get(n), null, [12, 50, 16, 20]]), `traspaso_bases${STOCK.zona ? "_" + STOCK.zona : ""}_${hoy()}.xlsx`);
 });
 $("#btn-imprimir").addEventListener("click", () => window.print());
 $("#btn-plantilla").addEventListener("click", () => {
