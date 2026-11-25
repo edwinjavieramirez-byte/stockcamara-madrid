@@ -1,0 +1,2164 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f2a3d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Buscador de artículos">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>Buscador de artículos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #f3f6f9; --card: #ffffff; --text: #14212b; --muted: #5d6b78; --line: #dde4ea;
+  --accent: #0b6fa4; --accent-ink: #ffffff; --ok: #1f8a4c; --ok-bg: #e5f5ec;
+  --warn: #a86400; --warn-bg: #fff3df; --bad: #c0362c; --bad-bg: #fde9e7; --chip: #eef3f7;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1820; --card: #15242f; --text: #e6eef4; --muted: #93a4b2; --line: #26394a;
+    --accent: #3aa3dc; --accent-ink: #06141d; --ok: #4cc283; --ok-bg: #12301f;
+    --warn: #f0a640; --warn-bg: #33260f; --bad: #f2786d; --bad-bg: #3a1714; --chip: #1d3242;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1820; --card: #15242f; --text: #e6eef4; --muted: #93a4b2; --line: #26394a;
+  --accent: #3aa3dc; --accent-ink: #06141d; --ok: #4cc283; --ok-bg: #12301f;
+  --warn: #f0a640; --warn-bg: #33260f; --bad: #f2786d; --bad-bg: #3a1714; --chip: #1d3242;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { position: sticky; top: 0; z-index: 5; background: #0f2a3d; color: #fff; padding-top: env(safe-area-inset-top); }
+/* el logo tiene fondo blanco: va en una franja blanca también en modo oscuro */
+.marca { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #fff; padding: 8px calc(16px + env(safe-area-inset-right)) 8px calc(16px + env(safe-area-inset-left)); }
+.marca img { display: block; height: 44px; width: auto; }
+.marca-txt { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 0; }
+.marca span { color: #2f7aa6; font-size: 14px; font-weight: 700; letter-spacing: .3px; text-align: right; }
+#btn-almacen { border: 1px solid #2f7aa6; border-radius: 99px; background: #fff; color: #14212b; padding: 3px 10px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+/* pantalla de entrada: elegir almacén */
+.elegir { position: fixed; inset: 0; z-index: 30; overflow-y: auto; background: #fff; color: #14212b; padding: calc(32px + env(safe-area-inset-top)) 24px 32px; text-align: center; }
+.elegir img { display: block; width: 200px; max-width: 70%; height: auto; margin: 0 auto 20px; }
+.elegir h1 { margin: 0 0 4px; font-size: 21px; color: #2f7aa6; }
+.elegir p { margin: 0 0 24px; color: #4a5763; }
+.elegir-lista { display: grid; gap: 12px; max-width: 420px; margin: 0 auto; }
+.elegir-lista button { width: 100%; padding: 18px; border: 0; border-radius: 14px; background: #2f7aa6; color: #fff; font: inherit; font-size: 19px; font-weight: 700; cursor: pointer; }
+.elegir-lista button.ultimo { outline: 3px solid #14212b; outline-offset: 2px; }
+.elegir-lista button.cancelar { background: none; color: #4a5763; font-size: 16px; font-weight: 500; }
+nav { display: flex; gap: 4px; overflow-x: auto; padding: 0 calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left)); }
+nav button { flex: 1; background: none; border: 0; color: #b9cbd8; padding: 10px 4px 12px; font: inherit; font-size: 15px; border-bottom: 3px solid transparent; white-space: nowrap; }
+nav button.on { color: #fff; border-bottom-color: #3aa3dc; font-weight: 600; }
+/* Traspaso es otra página: un enlace con el mismo aspecto que las pestañas */
+nav a.nav-link { flex: 1; display: flex; align-items: center; justify-content: center; color: #b9cbd8; padding: 10px 4px 12px; font-size: 15px; text-decoration: none; border-bottom: 3px solid transparent; white-space: nowrap; }
+/* en el móvil las pestañas van en dos filas para no tener que hacer la letra más pequeña:
+   seis (3 + 3) para todos, ocho (4 + 4) para el responsable, que además tiene Pickings y Traspaso */
+@media (max-width: 560px) { nav { flex-wrap: wrap; gap: 0; padding-left: 8px; padding-right: 8px; } nav > * { flex: 1 0 33%; padding-top: 8px; padding-bottom: 9px; } nav:has(#nav-pick:not(.hidden)) > * { flex-basis: 25%; } }
+main { padding: 16px; max-width: 760px; margin: 0 auto; padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+section.tab { display: none; }
+section.tab.on { display: block; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+.card h2 { margin: 0 0 8px; font-size: 17px; }
+.card h3 { margin: 12px 0 6px; font-size: 15px; }
+.muted { color: var(--muted); font-size: 14px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 10px; padding: 10px 14px; font: inherit; font-size: 15px; cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.big { width: 100%; padding: 18px; font-size: 18px; border-radius: 14px; }
+.btn.small { padding: 6px 10px; font-size: 14px; }
+.btn:disabled { opacity: .5; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row > * { flex: 1 1 auto; }
+input[type=text], input[type=search], input[type=password], input[type=number], select {
+  width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; }
+label.f { display: block; font-size: 14px; color: var(--muted); margin: 10px 0 4px; }
+.hidden { display: none !important; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.tile b { display: block; font-size: 26px; }
+.tile span { color: var(--muted); font-size: 13px; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 13px; font-weight: 600; background: var(--chip); }
+.badge.ok { background: var(--ok-bg); color: var(--ok); }
+.badge.warn { background: var(--warn-bg); color: var(--warn); }
+.badge.bad { background: var(--bad-bg); color: var(--bad); }
+.verdict { border-radius: 12px; padding: 14px; font-size: 17px; font-weight: 600; margin: 10px 0; }
+.verdict.ok { background: var(--ok-bg); color: var(--ok); }
+.verdict.bad { background: var(--bad-bg); color: var(--bad); }
+.verdict.warn { background: var(--warn-bg); color: var(--warn); }
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { border-top: 1px solid var(--line); padding: 10px 0; }
+.list li:first-child { border-top: 0; }
+.mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 14px; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tbl th, .tbl td { text-align: left; padding: 6px 4px; border-top: 1px solid var(--line); vertical-align: top; }
+.tbl th { color: var(--muted); font-weight: 500; }
+.tbl td:first-child { white-space: nowrap; }
+.tbl tr.here td { background: var(--ok-bg); }
+.scroll { overflow-x: auto; }
+.thumb { max-width: 100%; max-height: 220px; border-radius: 10px; display: block; margin: 10px auto 0; }
+.status { padding: 10px 12px; border-radius: 10px; background: var(--chip); margin-top: 10px; font-size: 15px; overflow-wrap: anywhere; }
+.cand { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.cand .s { color: var(--muted); font-size: 13px; white-space: nowrap; }
+details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+.map-grid { display: grid; grid-template-columns: 1fr 1.4fr; gap: 6px 10px; align-items: center; }
+.map-grid label { font-size: 14px; }
+/* bloque grande del destino */
+.destino { --d-bg: #0b6fa4; border-radius: 18px; padding: 18px 16px 16px; margin: 0 0 14px; color: #fff; background: var(--d-bg);
+  box-shadow: 0 8px 24px -10px var(--d-bg); text-align: center; animation: pop .25s ease-out; }
+.destino.mover { --d-bg: #c8102e; }
+.destino.aqui { --d-bg: #148046; }
+.destino.info { --d-bg: #0b6fa4; }
+.destino.sin { --d-bg: #b56a00; }
+.destino-tit { font-size: 19px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; opacity: .95; }
+.destino-ico { font-size: 34px; line-height: 1; margin-bottom: 6px; }
+.destino-ubi { margin-top: 12px; }
+.destino-ubi + .destino-ubi { border-top: 1px dashed rgba(255,255,255,.45); padding-top: 12px; }
+.ubi-partes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ubi-parte { background: rgba(255,255,255,.16); border-radius: 12px; padding: 10px 2px 12px; }
+.ubi-parte span { display: block; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; opacity: .85; }
+.ubi-parte b { display: block; font: 800 46px/1.05 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.ubi-codigo { font: 700 16px ui-monospace, "SF Mono", Menlo, Consolas, monospace; opacity: .9; margin-bottom: 8px; letter-spacing: .5px; }
+.ubi-extra { margin-top: 8px; font-size: 15px; opacity: .95; }
+.ubi-entera { font: 800 46px/1.1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; word-break: break-all; }
+.ubi-nivel { display: inline-block; margin-top: 8px; padding: 3px 12px; border-radius: 99px; background: rgba(255,255,255,.22); font-size: 14px; font-weight: 700; }
+.destino-pie { margin-top: 12px; font-size: 15px; opacity: .95; }
+.destino-pie s { opacity: .8; }
+#resultado { scroll-margin-top: 130px; }
+/* stock del artículo escaneado, por ubicación */
+.stk .tiles { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+.tile.bad { background: var(--bad-bg); border-color: var(--bad); }
+.tile.bad b, .tile.bad span { color: var(--bad); }
+.stk-cab { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.stk-ubi { font: 700 16px ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.stk-cj { margin-left: auto; font-size: 17px; white-space: nowrap; }
+.stk-u.aqui { background: var(--chip); margin: 0 -14px; padding-left: 14px; padding-right: 14px; }
+.stk-aviso { color: var(--bad); font-weight: 700; font-size: 14px; margin-top: 2px; }
+@keyframes pop { from { transform: scale(.94); } to { transform: none; } }
+/* pickings con más de un artículo */
+.pick-pestanas { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
+.pick-pestanas .btn.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.pick-pestanas .btn.on .badge { background: rgba(255,255,255,.25); color: inherit; }
+.pick { padding: 0; overflow: hidden; }
+.pick-cab { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--warn-bg); border-bottom: 1px solid var(--line); }
+.pick.n3 .pick-cab { background: var(--bad-bg); }
+.pick.hecho .pick-cab { background: var(--ok-bg); }
+.pick-cab .lbl { font-size: 11px; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); }
+.pick-ubi { font: 800 22px/1.15 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .5px; overflow-wrap: anywhere; }
+.pick-num { margin-left: auto; text-align: center; border-radius: 10px; padding: 4px 10px; min-width: 56px; background: var(--warn); color: var(--card); }
+.pick.n3 .pick-num { background: var(--bad); }
+.pick.hecho .pick-num { background: var(--ok); }
+.pick-num b { display: block; font-size: 20px; line-height: 1; }
+.pick-num span { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; }
+.pick-arts { list-style: none; margin: 0; padding: 0 14px; }
+.pick-arts li { border-top: 1px solid var(--line); padding: 10px 0; }
+.pick-arts li:first-child { border-top: 0; }
+.pick-art { display: inline-block; font: 700 14px ui-monospace, "SF Mono", Menlo, Consolas, monospace; background: var(--chip); color: var(--accent); border-radius: 6px; padding: 1px 8px; margin-right: 6px; }
+.pick-stk { margin-top: 6px; font-size: 13px; color: var(--muted); }
+.pick-sl { display: inline-block; font: 13px ui-monospace, "SF Mono", Menlo, Consolas, monospace; background: var(--ok-bg); color: var(--ok); border-radius: 6px; padding: 1px 7px; margin: 3px 4px 0 0; white-space: nowrap; }
+.pick-sl.aqui { background: var(--ok); color: var(--card); }
+.pick-pie { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--line); }
+mark { background: #fde047; color: #14212b; border-radius: 2px; }
+@media print {
+  header, .noprint, .toast, nav { display: none !important; }
+  html, body { background: #fff; }
+  main { padding: 0; max-width: none; }
+  .pick { break-inside: avoid; }
+  .pick-pie .btn { display: none; }
+}
+/* descargas: listado de pedidos con su picking */
+.ped-titulo { margin: 0 0 12px; }
+.ped-titulo h2 { margin: 0; font-size: 18px; letter-spacing: .3px; }
+.ped-titulo p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.ped { background: var(--card); border: 1px solid var(--line); border-radius: 12px; margin: 0 0 12px; overflow: hidden; }
+.ped-cab { display: flex; flex-wrap: wrap; gap: 2px 16px; align-items: baseline; padding: 9px 12px; background: var(--chip); font-size: 13px; }
+.ped-cab b { font-size: 15px; margin-right: auto; }
+.ped-cab span { color: var(--muted); white-space: nowrap; }
+.ped-aviso { padding: 7px 12px; background: var(--warn-bg); color: var(--warn); font-size: 13px; font-weight: 600; }
+.ped-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ped-tbl th { text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .3px; padding: 6px; }
+.ped-tbl td { padding: 6px; border-top: 1px solid var(--line); vertical-align: top; }
+.ped-tbl .num { text-align: right; white-space: nowrap; }
+.ped-tbl .cod { font: 700 13px ui-monospace, "SF Mono", Menlo, Consolas, monospace; white-space: nowrap; }
+.ped-tbl tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
+.ped-pk { font: 800 15px ui-monospace, "SF Mono", Menlo, Consolas, monospace; white-space: nowrap; color: var(--accent); }
+.ped-pk + .ped-pk { margin-top: 2px; }
+.ped-sin { display: inline-block; font-size: 12px; font-weight: 700; color: var(--warn); background: var(--warn-bg); border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+@media screen and (max-width: 700px) { .ped-tbl .imp { display: none; } }
+@media print {
+  @page { margin: 10mm; }
+  #ped-doc, #ped-doc * { color: #000 !important; background: transparent !important; }
+  .ped { border: 0; border-radius: 0; margin: 0 0 9px; break-inside: avoid; }
+  .ped-cab { border-bottom: 1.5px solid #000; padding: 3px 0; font-size: 9pt; }
+  .ped-cab b { font-size: 10pt; }
+  .ped-tbl { font-size: 8.5pt; }
+  .ped-tbl thead { display: table-header-group; }
+  .ped-tbl th { font-size: 7pt; padding: 3px 4px; }
+  .ped-tbl td { padding: 3px 4px; border-top-color: #bbb; }
+  .ped-tbl .cod { font-size: 8.5pt; }
+  .ped-pk { font-size: 10.5pt; }
+  .ped-sin { border: 1px solid #000; }
+  .ped-aviso { border: 1px solid #000; padding: 3px 6px; font-size: 8.5pt; }
+}
+/* ubicaciones libres: casillas como en la hoja impresa */
+.libre-tag { display: inline-block; background: #ffd23f; color: #14212b; font: 700 12px ui-monospace, "SF Mono", Menlo, Consolas, monospace; padding: 3px 8px; letter-spacing: .05em; }
+.libre-cab { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; border-bottom: 3px solid var(--text); padding-bottom: 10px; margin-bottom: 10px; }
+.libre-total { text-align: right; flex: 0 0 auto; }
+.libre-total b { display: block; font: 800 40px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.libre-total span { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.libre-niveles { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0 0 12px; }
+.libre-niveles label { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.libre-niveles input { width: 20px; height: 20px; accent-color: var(--accent); }
+.libre-fila { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; border-top: 1px solid var(--line); padding: 12px 0; }
+.libre-fila:first-of-type { border-top: 0; }
+.libre-fila > div:first-child b { display: block; font-size: 24px; line-height: 1; }
+.libre-fila > div:first-child span { font-size: 13px; color: var(--muted); }
+.libre-nivel { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; align-items: start; padding: 3px 0; }
+.libre-nivel > span { font-size: 13px; font-weight: 700; text-transform: uppercase; padding-top: 6px; }
+.libre-nivel > span em { display: block; font-style: normal; font-weight: 400; font-size: 11px; color: var(--muted); }
+.libre-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.libre-ch { display: inline-flex; align-items: center; gap: 6px; border: 1.5px solid var(--text); border-radius: 4px; background: var(--card); color: var(--text); padding: 6px 9px 6px 7px; font: 700 15px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; cursor: pointer; }
+.libre-ch i { display: inline-block; width: 11px; height: 11px; border: 1.5px solid currentColor; border-radius: 2px; }
+.libre-ch:active { border-color: var(--accent); color: var(--accent); }
+.libre-none { color: var(--muted); font-size: 14px; padding-top: 6px; }
+@media (max-width: 480px) { .libre-fila { grid-template-columns: 1fr; gap: 6px; } }
+.toast { position: fixed; left: 16px; right: 16px; bottom: 16px; background: #14212b; color: #fff; padding: 12px 14px; border-radius: 12px; z-index: 20; text-align: center; max-width: 520px; margin: 0 auto; }
+</style>
+</head>
+<body>
+<div class="elegir hidden" id="elegir-almacen" role="dialog" aria-label="Elegir almacén">
+  <img src="logo-garcimar.png" alt="Garcimar">
+  <h1>Buscador de artículos</h1>
+  <p>¿En qué almacén vas a trabajar?</p>
+  <div class="elegir-lista" id="elegir-lista"></div>
+</div>
+<header>
+  <div class="marca"><img src="logo-garcimar.png" alt="Garcimar" width="104" height="44"><div class="marca-txt"><span>Buscador de artículos</span><button id="btn-almacen" aria-label="Cambiar de almacén"></button></div></div>
+  <nav>
+    <button data-tab="escanear" class="on">Escanear</button>
+    <button data-tab="descargas">Descargas</button>
+    <button data-tab="informe">Informe</button>
+    <button data-tab="pickings" id="nav-pick" class="hidden">Pickings</button>
+    <button data-tab="libres">Libres</button>
+    <button data-tab="datos">Datos</button>
+    <a href="traspaso.html" class="nav-link hidden" id="nav-traspaso">Traspaso</a>
+    <button data-tab="ajustes">Ajustes</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ESCANEAR -->
+  <section class="tab on" id="tab-escanear">
+    <div class="card" id="aviso-sin-datos">
+      <b>Todavía no hay datos cargados.</b>
+      <p class="muted">Carga el Excel de stock (y el maestro de picking si lo tienes) en la pestaña <b>Datos</b>, o prueba con los datos de ejemplo.</p>
+      <button class="btn" id="btn-ir-datos">Ir a Datos</button>
+    </div>
+
+    <div class="card">
+      <label class="f" for="ubi-actual">Ubicación donde estás (opcional)</label>
+      <input type="text" id="ubi-actual" placeholder="Ej. 08-01-004-01-1" autocomplete="off">
+      <div style="height:12px"></div>
+      <button class="btn primary big" id="btn-foto">📷 Hacer foto de la etiqueta</button>
+      <div class="row" style="margin-top:8px">
+        <button class="btn small" id="btn-galeria">Elegir de la galería</button>
+      </div>
+      <input type="file" id="in-foto" accept="image/*" capture="environment" class="hidden">
+      <input type="file" id="in-galeria" accept="image/*" class="hidden">
+      <img id="thumb" class="thumb hidden" alt="Foto de la etiqueta">
+      <div id="estado-escaneo" class="status hidden"></div>
+    </div>
+
+    <div id="resultado"></div>
+
+    <div class="card">
+      <h2>Búsqueda manual</h2>
+      <p class="muted">Gratis, sin foto: busca por nombre, nº de artículo, lote o UA.</p>
+      <input type="search" id="buscar" placeholder="Ej. gamba, 1001, L24187, 00385…" autocomplete="off">
+      <ul class="list" id="res-buscar"></ul>
+    </div>
+  </section>
+
+  <!-- DESCARGAS: el listado de pedidos con el picking de cada artículo -->
+  <section class="tab" id="tab-descargas">
+    <div class="card noprint">
+      <h2>Descargas del día</h2>
+      <p class="muted">Carga el PDF del <b>Listado pedidos de compras</b> y te digo en qué picking va cada artículo, separado por proveedor y con los mismos datos del listado. Después lo puedes imprimir.</p>
+      <label class="btn primary big" for="in-pedidos">📄 Cargar listado de pedidos (PDF)</label>
+      <input type="file" id="in-pedidos" accept="application/pdf,.pdf" class="hidden">
+      <div id="ped-estado" class="status hidden"></div>
+      <div class="row hidden" id="ped-acciones" style="margin-top:10px">
+        <button class="btn small primary" id="btn-ped-imprimir">🖨️ Imprimir</button>
+        <button class="btn small" id="btn-ped-excel">⬇️ Excel</button>
+        <button class="btn small" id="btn-ped-quitar">Quitar el listado</button>
+      </div>
+    </div>
+    <div class="tiles noprint" id="ped-tiles"></div>
+    <div id="ped-doc"></div>
+  </section>
+
+  <!-- INFORME -->
+  <section class="tab" id="tab-informe">
+    <div class="tiles" id="tiles"></div>
+    <div class="card">
+      <div class="row">
+        <input type="search" id="filtro-informe" placeholder="Filtrar por ubicación, artículo o nombre">
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn small" id="btn-export-mov">⬇️ Exportar movimientos a Excel</button>
+      </div>
+    </div>
+    <div class="card"><h2>Movimientos a hacer</h2><p class="muted">Cajas en un picking que no es el suyo y adónde deben ir.</p><div id="inf-mov"></div></div>
+    <div class="card"><h2>Pickings con problemas</h2><p class="muted">Ubicaciones de picking con varios artículos o con un artículo que no les corresponde.</p><div id="inf-mezcla"></div></div>
+    <div class="card"><h2>Pickings sin su artículo</h2><p class="muted">Pickings asignados donde no hay stock de su artículo, y dónde hay palets para reponer.</p><div id="inf-vacios"></div></div>
+  </section>
+
+  <!-- PICKINGS MULTI-ARTÍCULO (solo responsable) -->
+  <section class="tab" id="tab-pickings">
+    <div class="tiles" id="pick-tiles"></div>
+    <div class="card noprint">
+      <h2>Pickings con más de un artículo</h2>
+      <p class="muted">Ubicaciones de picking que el maestro asigna a varios artículos, y dónde hay stock de cada uno en ubicaciones de picking (sin altura). Sale del maestro y del stock cargados en <b>Datos</b>.</p>
+      <input type="search" id="pick-buscar" placeholder="Buscar picking, artículo, descripción o ubicación de stock" autocomplete="off">
+      <div class="row" style="margin-top:10px">
+        <select id="pick-orden" style="flex:1 1 180px"><option value="ubi">Ordenar por picking</option><option value="n">Más artículos primero</option></select>
+        <button class="btn small" id="btn-pick-export">⬇️ Exportar a Excel</button>
+        <button class="btn small" id="btn-pick-imprimir">🖨️ Imprimir</button>
+      </div>
+    </div>
+    <div class="pick-pestanas noprint">
+      <button class="btn small on" data-pick="pend">Pendientes <span class="badge" id="pick-n-pend">0</span></button>
+      <button class="btn small" data-pick="hecho">Hechos <span class="badge" id="pick-n-hecho">0</span></button>
+      <button class="btn small hidden" id="btn-pick-reset">Volver todos a pendientes</button>
+    </div>
+    <p class="muted" id="pick-cuenta"></p>
+    <div id="pick-lista"></div>
+    <div class="row noprint" style="justify-content:center"><button class="btn hidden" id="btn-pick-mas" style="flex:0 1 auto">Mostrar más</button></div>
+  </section>
+
+  <!-- UBICACIONES LIBRES (todos) -->
+  <section class="tab" id="tab-libres">
+    <div class="card">
+      <span class="libre-tag" id="libres-tag"></span>
+      <div class="libre-cab">
+        <div><h2 style="margin:6px 0 2px">Ubicaciones libres</h2><p class="muted" style="margin:0">Picking vacío y sin ningún artículo asignado: se puede usar para un artículo nuevo.</p></div>
+        <div class="libre-total"><b id="libres-total">—</b><span>ubicaciones</span></div>
+      </div>
+      <div class="libre-niveles" id="libres-niveles"></div>
+      <button class="btn primary big" id="btn-libres-pdf" disabled>🖨️ PDF para imprimir</button>
+      <p class="muted" id="libres-fuente" style="margin:8px 0 0"></p>
+    </div>
+    <div id="libres-avisos"></div>
+    <div id="libres-lista"></div>
+  </section>
+
+  <!-- DATOS -->
+  <section class="tab" id="tab-datos">
+    <div class="card">
+      <h2 id="datos-titulo">Cargar Excel</h2>
+      <p class="muted" id="datos-intro"></p>
+      <div id="base-estado"></div>
+      <div id="cargas"></div>
+    </div>
+    <div class="card" id="mapeo" style="display:none"></div>
+    <div class="card" id="card-ejemplo">
+      <h2>Datos de ejemplo</h2>
+      <p class="muted">Para probar la app sin tus Excel. Sustituye lo que haya cargado.</p>
+      <button class="btn" id="btn-ejemplo">Cargar datos de ejemplo</button>
+    </div>
+    <div class="card hidden" id="card-traspaso">
+      <h2>Traspaso entre almacenes</h2>
+      <p class="muted">Carga el Excel con los kilos que pide otro almacén y te dice cuántas bases enviar de cada referencia, siempre por encima de lo pedido.</p>
+      <a class="btn" href="traspaso.html" style="text-decoration:none">📦 Calcular bases de un traspaso</a>
+    </div>
+    <div class="card">
+      <h2>Exportar</h2>
+      <p class="muted">El maestro de picking incluye las asignaciones que hagas desde la app.</p>
+      <div class="row">
+        <button class="btn small" id="btn-export-maestro">⬇️ Maestro de picking</button>
+        <button class="btn small" id="btn-export-alias">⬇️ Alias aprendidos</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- AJUSTES -->
+  <section class="tab" id="tab-ajustes">
+    <div class="card">
+      <h2>Ubicaciones</h2>
+      <p style="margin:0 0 8px">Estás trabajando en <b id="aj-almacen"></b></p>
+      <button class="btn small" id="btn-cambiar-almacen">Cambiar de almacén</button>
+      <p class="muted">Todo lo que sea de otro almacén se ignora en los Excel. Al escribir tu ubicación puedes omitir el almacén: «01-004-01-1» se completa con el almacén en el que estás.</p>
+      <p class="muted">Formato reconocido: <b>AA-FF-HHH-NN-1</b> (almacén-fila-hueco-nivel), con o sin guiones. El 1 final es fijo en todas las ubicaciones y no significa nada.</p>
+      <p class="muted">Los niveles 1 y 2 son picking y del 3 en adelante, reserva. Si el Excel de ubicaciones vacías indica otro tipo, manda ese (por ejemplo, algunos terceros de Barcelona son picking). La playa (en Barcelona, las ubicaciones que empiezan por 013, 014 y 017) es siempre reserva, desde el suelo hasta el nivel 06.</p>
+      <label class="f" for="aj-digitos">Solo para otros formatos: cuántos dígitos finales indican el nivel</label>
+      <input type="number" id="aj-digitos" min="1" max="3">
+      <label class="f" for="aj-niveles">Niveles de picking (separados por coma)</label>
+      <input type="text" id="aj-niveles">
+      <label class="f" for="aj-playa">Playa: ubicaciones que empiezan por… (siempre reserva, todos los niveles)</label>
+      <input type="text" id="aj-playa" placeholder="013, 014, 017" autocomplete="off">
+      <p class="muted" id="aj-ejemplo"></p>
+    </div>
+    <div class="card">
+      <h2>Escaneo con IA</h2>
+      <div id="ia-codigo"></div>
+      <p class="muted" id="aj-uso"></p>
+      <div id="aj-uso-todos" class="hidden"></div>
+    </div>
+    <div class="card">
+      <h2>Tema</h2>
+      <select id="aj-tema"><option value="">Automático</option><option value="light">Claro</option><option value="dark">Oscuro</option></select>
+    </div>
+    <div class="card">
+      <h2>Borrar</h2>
+      <div class="row">
+        <button class="btn small" id="btn-borrar-alias">Borrar alias aprendidos</button>
+        <button class="btn small" id="btn-borrar-todo">Borrar todos los datos</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+// ---------- utilidades ----------
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const norm = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const normUbi = (s) => String(s ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const normArt = (s) => String(s ?? "").trim().replace(/\.0+$/, "").replace(/^0+(?=\d)/, "").toUpperCase();
+const normLote = (s) => String(s ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const normDigitos = (s) => String(s ?? "").replace(/\D/g, "");
+const pad = (n) => String(n).padStart(2, "0");
+
+function toast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2600);
+}
+
+function normFecha(v) {
+  if (v == null || v === "") return "";
+  if (v instanceof Date && !isNaN(v)) {
+    const d = new Date(v.getTime() + 12 * 3600e3);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+  if (typeof v === "number" && v > 20000 && v < 80000 && window.XLSX) {
+    const p = XLSX.SSF.parse_date_code(v);
+    return `${p.y}-${pad(p.m)}-${pad(p.d)}`;
+  }
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/);
+  if (m) { const y = m[3].length === 2 ? "20" + m[3] : m[3]; return `${y}-${pad(m[2])}-${pad(m[1])}`; }
+  m = s.match(/^(\d{2})(\d{2})(\d{2})$/); // AAMMDD (GS1)
+  if (m) return `20${m[1]}-${m[2]}-${m[3] === "00" ? "28" : m[3]}`;
+  return s;
+}
+const verFecha = (f) => { const m = String(f).match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[3]}/${m[2]}/${m[1]}` : f; };
+
+// ---------- almacenamiento (IndexedDB con respaldo en memoria) ----------
+const store = (() => {
+  const mem = {};
+  let dbp = null;
+  try {
+    dbp = new Promise((res, rej) => {
+      const r = indexedDB.open("stock-camara", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("kv");
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  } catch { dbp = Promise.reject(); }
+  const tx = async (modo, fn) => {
+    const db = await dbp;
+    return new Promise((res, rej) => {
+      const t = db.transaction("kv", modo);
+      const q = fn(t.objectStore("kv"));
+      t.oncomplete = () => res(q && q.result);
+      t.onerror = () => rej(t.error);
+    });
+  };
+  return {
+    async get(k) { try { return await tx("readonly", (s) => s.get(k)); } catch { return mem[k]; } },
+    async set(k, v) { mem[k] = v; try { await tx("readwrite", (s) => s.put(v, k)); } catch {} },
+    async del(k) { delete mem[k]; try { await tx("readwrite", (s) => s.delete(k)); } catch {} },
+  };
+})();
+
+// ---------- definición de los Excel ----------
+const TIPOS = {
+  stock: {
+    titulo: "Stock almacén", desc: "Artículo, descriptivo, lote, caducidad, cajas, peso, UA, situación (505 = caducado), entrada, ubicación",
+    campos: [
+      ["articulo", "Nº artículo", true], ["descripcion", "Descriptivo", true], ["lote", "Lote"], ["caducidad", "Fecha caducidad"],
+      ["cajas", "Cajas / unidades"], ["peso", "Peso (kg)"], ["ua", "Nº UA"], ["situacion", "Situación"], ["sitDesc", "Descripción situación / Caducado"], ["entrada", "Nº entrada"], ["ubicacion", "Ubicación", true],
+    ],
+  },
+  maestro: {
+    titulo: "Maestro de picking", desc: "Qué ubicación de picking tiene asignada cada artículo",
+    campos: [["articulo", "Nº artículo", true], ["ubicacion", "Ubicación de picking", true], ["descripcion", "Descriptivo"]],
+  },
+  vacias: {
+    titulo: "Ubicaciones vacías", desc: "Ubicaciones sin mercancía (RPT_XLS_UbicacionesVaciasDisponibles)",
+    campos: [["ubicacion", "Ubicación", true], ["tipo", "Tipo de ubicación (Picking / Reserva)"]],
+  },
+};
+const CLAVES = {
+  articulo: ["articulo", "material", "codigo", "referencia", "sku", "item", "cod", "art", "ref"],
+  descripcion: ["descriptivo", "descripcion", "denominacion", "designacion", "nombre", "texto", "descrip"],
+  lote: ["lote", "batch", "lot"],
+  caducidad: ["caducidad", "fecha cad", "consumo", "vencimiento", "expiracion", "caduc", "fcad", "bbd", "cad"],
+  cajas: ["cajas", "cantidad", "unidades", "bultos", "uds", "cant", "stock"],
+  peso: ["peso", "kilos", "kgs", "kg"], // con las cajas da el kg por caja de cada artículo (traspasos por bases)
+  ua: ["ua", "sscc", "contenedor", "matricula", "palet", "pallet", "hu"],
+  situacion: ["situacion", "estado", "status", "sit"],
+  sitDesc: ["descripcion situacion", "desc situacion", "texto situacion", "caducado"],
+  entrada: ["entrada", "recepcion", "albaran"],
+  ubicacion: ["nombre ubicacion", "ubicacion", "ubic", "posicion", "location", "hueco"],
+  tipo: ["descripcion tipo ubicacion", "tipo ubicacion", "tipo ubic"],
+};
+function puntuarCabecera(campo, cabecera) {
+  const h = norm(cabecera);
+  if (!h) return 0;
+  const toks = h.split(" ");
+  if (campo === "articulo" && /descrip|nombre|denomin|texto/.test(h)) return 0;
+  // "Nombre ubicación", "Descripción tipo ubicación", "Descripción zona"… no son el descriptivo del artículo
+  if (campo === "descripcion" && /ubic|zona|area|tipo|almacen|situacion/.test(h)) return 0;
+  // «Caducado» es la situación del palet, no su fecha de caducidad
+  if (campo === "caducidad" && /caducado/.test(h)) return 0;
+  if (campo === "situacion" && /descrip|texto|caducado/.test(h)) return 0;
+  if (campo === "ubicacion" && /tipo|zona|area/.test(h)) return 0;
+  const lista = CLAVES[campo] || [];
+  for (let i = 0; i < lista.length; i++) {
+    const k = lista[i];
+    const ok = k.length <= 3 ? toks.includes(k) : h.includes(k);
+    if (ok) return 100 - i * 5 - (h.length - k.length) * 0.2;
+  }
+  return 0;
+}
+function adivinarMapeo(tipo, cabeceras, guardado) {
+  const campos = TIPOS[tipo].campos.map((c) => c[0]);
+  const mapeo = {};
+  const usadas = new Set();
+  if (guardado) {
+    for (const c of campos) {
+      const i = cabeceras.indexOf(guardado[c]);
+      if (guardado[c] && i >= 0) { mapeo[c] = i; usadas.add(i); }
+    }
+  }
+  const pares = [];
+  for (const c of campos) {
+    if (c in mapeo) continue;
+    cabeceras.forEach((h, i) => { const p = puntuarCabecera(c, h); if (p > 0) pares.push([p, c, i]); });
+  }
+  pares.sort((a, b) => b[0] - a[0]);
+  for (const [, c, i] of pares) if (!(c in mapeo) && !usadas.has(i)) { mapeo[c] = i; usadas.add(i); }
+  return mapeo;
+}
+function filaCabecera(filas) {
+  let mejor = 0, mejorP = -1;
+  for (let r = 0; r < Math.min(filas.length, 15); r++) {
+    const fila = filas[r] || [];
+    let p = 0;
+    for (const v of fila) if (typeof v === "string" && Object.keys(CLAVES).some((c) => puntuarCabecera(c, v) > 0)) p++;
+    if (p > mejorP) { mejorP = p; mejor = r; }
+  }
+  return mejor;
+}
+
+// ---------- estado ----------
+let S = {
+  stock: null, maestro: null, vacias: null, maestroManual: [], alias: {}, mapeos: {}, tiposUbi: {}, pickHechos: {},
+  ajustes: { digitos: 1, niveles: "1,2", codigo: "", tema: "", zona: "08", responsable: false }, uso: {},
+  colaEv: [], baseVer: {}, basePend: [],
+};
+let IDX = null;
+
+async function cargarEstado() {
+  // la pestaña Movimientos ya no existe: lo que tuviera guardado este dispositivo se borra
+  for (const k of ["hechos", "feed"]) store.del(k);
+  for (const k of Object.keys(S)) { if (POR_ALMACEN.includes(k)) continue; const v = await store.get(k); if (v !== undefined) S[k] = v; }
+  S.ajustes = Object.assign({ digitos: 1, niveles: "1,2", codigo: "", tema: "", zona: "08", responsable: false }, S.ajustes);
+  // Identificador de este dispositivo (al azar, no dice nada de él): sirve para contar cuántos usan la app
+  if (!/^[a-z0-9]{8,32}$/.test(S.ajustes.dispositivo || "")) {
+    const azar = crypto.getRandomValues(new Uint8Array(12));
+    S.ajustes.dispositivo = [...azar].map((b) => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36]).join("");
+    await guardar("ajustes");
+  }
+  // Lo cargado antes de separar por almacén pasa al almacén que tenía elegido este dispositivo
+  if (!S.ajustes.porAlmacen) {
+    S.ajustes.zona = String(S.ajustes.zona || "").trim() || "08";
+    for (const k of POR_ALMACEN) {
+      const v = await store.get(k);
+      if (v !== undefined) { await store.set(claveDe(k), v); await store.del(k); }
+    }
+    S.ajustes.porAlmacen = true;
+    await guardar("ajustes");
+  }
+  await cargarAlmacen();
+  // Una versión anterior podía recordar tipos sacados de una columna equivocada: se rehacen una vez desde las vacías
+  if (!S.ajustes.tiposRevisados) {
+    S.tiposUbi = {};
+    for (const f of S.vacias?.filas || []) { const t = tipoEsPicking(f.tipo); if (t !== null) S.tiposUbi[normUbi(f.ubicacion)] = t; }
+    S.ajustes.tiposRevisados = true;
+    await guardar("tiposUbi"); await guardar("ajustes");
+  }
+}
+// Lo de cada almacén se guarda aparte en el dispositivo (stock@08, stock@01…); S solo tiene el almacén elegido
+const POR_ALMACEN = ["stock", "maestro", "vacias", "tiposUbi", "baseVer", "basePend"];
+const claveDe = (k) => (POR_ALMACEN.includes(k) ? `${k}@${S.ajustes.zona}` : k);
+const guardar = (k) => store.set(claveDe(k), S[k]);
+async function cargarAlmacen() {
+  const vacio = { stock: null, maestro: null, vacias: null, tiposUbi: {}, baseVer: {}, basePend: [] };
+  for (const k of POR_ALMACEN) { const v = await store.get(claveDe(k)); S[k] = v !== undefined ? v : vacio[k]; }
+}
+
+// ---------- índice ----------
+// Formato: AA-FF-HHH-NN-1 (almacén-fila-hueco-nivel; el 1 final es fijo en el programa), p. ej. 01-01-002-03-1
+// o el mismo código sin guiones (0101002031).
+function partesUbi(u) {
+  let p = String(u ?? "").trim().toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
+  if (p.length === 1 && /^\d{10}$/.test(p[0])) { const d = p[0]; p = [d.slice(0, 2), d.slice(2, 4), d.slice(4, 7), d.slice(7, 9), d.slice(9)]; }
+  if (p.length === 5) return { zona: p[0], fila: p[1], hueco: p[2], nivel: p[3], pos: p[4] };
+  if (p.length === 3) return { fila: p[0], hueco: p[1], nivel: p[2] };
+  return null;
+}
+function nivelDe(u) {
+  const pp = partesUbi(u);
+  if (pp && /^\d+$/.test(pp.nivel)) return parseInt(pp.nivel, 10);
+  const d = normUbi(u).slice(-Math.max(1, +S.ajustes.digitos || 1));
+  return /^\d+$/.test(d) ? parseInt(d, 10) : null;
+}
+const nivelesPicking = () => new Set(String(S.ajustes.niveles).split(/[^\d]+/).filter(Boolean).map(Number));
+// El tipo que da el sistema (Picking / Reserva) manda; si no se conoce, se decide por el nivel.
+let TIPO_UBI = new Map(); // ubi normalizada -> true (picking) / false
+function tipoEsPicking(t) {
+  const s = norm(t);
+  if (s.includes("picking")) return true;
+  if (/reserva|muelle|dock|transit/.test(s)) return false;
+  return null; // un valor que no se reconoce no dice nada: se decide por el nivel
+}
+// Playa: ubicaciones que no están en ningún pasillo y solo sirven para guardar género (en Barcelona, las que
+// empiezan por 013, 014 y 017). Siempre son reserva, de suelo a altura, diga lo que diga el tipo del sistema.
+const PLAYA_DEF = "013, 014, 017";
+const prefijosPlaya = () => String(S.ajustes.playa ?? PLAYA_DEF).split(/[^0-9A-Za-z]+/).map(normUbi).filter(Boolean);
+const esPlaya = (u) => { const c = normUbi(u); return !!c && prefijosPlaya().some((p) => c.startsWith(p)); };
+const esPicking = (u) => !esPlaya(u) && (TIPO_UBI.get(normUbi(u)) ?? nivelesPicking().has(nivelDe(u)));
+// Solo se trabaja con el almacén elegido (S.ajustes.zona); el resto de almacenes de los Excel se ignora.
+const enZona = (u) => { const z = normUbi(S.ajustes.zona); return !z || normUbi(u).startsWith(z); };
+// Si el operario escribe la ubicación sin la zona (01-004-01-1 o 01004011), se le añade
+function completarUbi(txt) {
+  const z = String(S.ajustes.zona || "").trim();
+  if (!z || !txt) return txt;
+  const p = txt.split(/[^A-Za-z0-9]+/).filter(Boolean);
+  if (p.length === 4) return `${z}-${p.join("-")}`;
+  if (p.length === 1 && /^\d{8}$/.test(p[0])) return z + p[0];
+  return txt;
+}
+const disponible = (f) => { const s = String(f.situacion ?? "").trim(); return !s || s === "100"; };
+// Situación 505 = caducado. Si el Excel trae además una columna con el texto de la situación (o una «Caducado»), también cuenta.
+const caducado = (f) => { const s = String(f.situacion ?? "").trim(), d = String(f.sitDesc ?? "").trim();
+  return /^505(\D|$)/.test(s) || /caduc/i.test(s) || /505|caduc|^(si|sí|x|1|true)$/i.test(d); };
+
+function construirIndice() {
+  TIPO_UBI = new Map(Object.entries(S.tiposUbi || {}).filter(([u]) => enZona(u))); // tipos recordados de cargas anteriores
+  for (const f of S.vacias?.filas || []) { // el Excel de stock no trae el tipo de ubicación
+    if (!enZona(f.ubicacion)) continue;
+    const t = tipoEsPicking(f.tipo);
+    if (t !== null) TIPO_UBI.set(normUbi(f.ubicacion), t);
+  }
+  const articulos = new Map(); // art -> {articulo, descripcion, filas[]}
+  const stockPorUbi = new Map(); // ubi -> filas[]
+  const asignadoPorUbi = new Map(); // ubi -> art (solo el último del maestro)
+  const asignadosDeUbi = new Map(); // ubi -> Set(art): todos los que el maestro asigna a ese picking
+  const pickingDeArt = new Map(); // art -> [ubi originales]
+  const ubiOriginal = new Map(); // ubi normalizada -> texto original
+  const vacias = new Set();
+
+  const art = (codigo, desc) => {
+    const k = normArt(codigo);
+    if (!articulos.has(k)) articulos.set(k, { k, articulo: String(codigo).trim(), descripcion: desc || "", filas: [] });
+    const a = articulos.get(k);
+    if (!a.descripcion && desc) a.descripcion = desc;
+    return a;
+  };
+  for (const f of S.stock?.filas || []) {
+    if (!enZona(f.ubicacion)) continue;
+    const a = art(f.articulo, f.descripcion);
+    const fila = { ...f, k: a.k, u: normUbi(f.ubicacion), loteN: normLote(f.lote), cad: normFecha(f.caducidad), uaN: normDigitos(f.ua) };
+    a.filas.push(fila);
+    if (!stockPorUbi.has(fila.u)) stockPorUbi.set(fila.u, []);
+    stockPorUbi.get(fila.u).push(fila);
+    ubiOriginal.set(fila.u, String(f.ubicacion).trim());
+  }
+  const maestro = [...(S.maestro?.filas || []), ...S.maestroManual].filter((m) => enZona(m.ubicacion));
+  for (const m of maestro) {
+    const a = art(m.articulo, m.descripcion);
+    const u = normUbi(m.ubicacion);
+    if (!u || !esPicking(m.ubicacion)) continue; // solo se envía a picking, nunca a niveles de almacenaje
+    asignadoPorUbi.set(u, a.k);
+    if (!asignadosDeUbi.has(u)) asignadosDeUbi.set(u, new Set());
+    asignadosDeUbi.get(u).add(a.k);
+    if (!pickingDeArt.has(a.k)) pickingDeArt.set(a.k, []);
+    if (!pickingDeArt.get(a.k).some((x) => normUbi(x) === u)) pickingDeArt.get(a.k).push(String(m.ubicacion).trim());
+    ubiOriginal.set(u, String(m.ubicacion).trim());
+  }
+  for (const v of S.vacias?.filas || []) { if (!enZona(v.ubicacion)) continue; const u = normUbi(v.ubicacion); vacias.add(u); ubiOriginal.set(u, String(v.ubicacion).trim()); }
+  for (const a of articulos.values()) {
+    a.nombreN = norm(a.descripcion);
+    a.lotes = [...new Set(a.filas.map((f) => f.loteN).filter(Boolean))];
+    a.cads = [...new Set(a.filas.map((f) => f.cad).filter(Boolean))];
+  }
+  IDX = { articulos, stockPorUbi, asignadoPorUbi, asignadosDeUbi, pickingDeArt, ubiOriginal, vacias, hayMaestro: maestro.length > 0 };
+}
+const verUbi = (u) => IDX.ubiOriginal.get(normUbi(u)) || u;
+
+// ---------- parecido de nombres ----------
+const VACIAS_PAL = new Set("de del la el los las en y con al a the of and with x kg g gr ml l lt und uds cong congelado congelada congelados frozen surgele tiefgekuhlt".split(" "));
+const tokens = (s) => norm(s).split(" ").filter((t) => t && !VACIAS_PAL.has(t));
+function trigramas(s) { const t = new Set(); const x = `  ${norm(s)} `; for (let i = 0; i < x.length - 2; i++) t.add(x.slice(i, i + 3)); return t; }
+function parecido(a, b) {
+  const A = tokens(a), B = tokens(b);
+  if (!A.length || !B.length) return 0;
+  let coinc = 0;
+  const usados = new Set();
+  for (const t of A) {
+    const j = B.findIndex((u, i) => !usados.has(i) && (u === t || (Math.min(u.length, t.length) >= 3 && (u.startsWith(t) || t.startsWith(u)))));
+    if (j >= 0) { usados.add(j); coinc++; }
+  }
+  const dice = (2 * coinc) / (A.length + B.length);
+  const ta = trigramas(a), tb = trigramas(b);
+  let inter = 0; for (const g of ta) if (tb.has(g)) inter++;
+  const tri = (2 * inter) / (ta.size + tb.size || 1);
+  return 0.6 * dice + 0.4 * tri;
+}
+function loteCoincide(l1, l2) {
+  if (!l1 || !l2) return false;
+  if (l1 === l2) return true;
+  return Math.min(l1.length, l2.length) >= 4 && (l1.includes(l2) || l2.includes(l1));
+}
+function rankear(lectura) {
+  const nombres = [...(lectura.nombres || []), lectura.nombre_es, [lectura.marca, lectura.nombre_es].filter(Boolean).join(" ")].filter(Boolean);
+  const lote = normLote(lectura.lote), cad = normFecha(lectura.caducidad);
+  const out = [];
+  for (const a of IDX.articulos.values()) {
+    let nom = 0;
+    for (const n of nombres) nom = Math.max(nom, parecido(n, a.descripcion));
+    const porLote = lote ? a.filas.filter((f) => loteCoincide(f.loteN, lote)) : [];
+    const porCad = cad ? a.cads.includes(cad) : false;
+    const total = nom + (porLote.length ? 0.6 : 0) + (porCad ? 0.25 : 0);
+    out.push({ a, nom, porLote, porCad, total });
+  }
+  out.sort((x, y) => y.total - x.total);
+  return out;
+}
+
+// ---------- códigos de barras (gratis, en el propio móvil) ----------
+function parsearGS1(raw) {
+  const r = { };
+  let s = String(raw).replace(/^\]([A-Za-z]\d)/, "").replace(/[()]/g, (c) => (c === "(" ? "\x1d" : "")).replace(/^\x1d/, "");
+  const fijos = { "00": 18, "01": 14, "02": 14, "11": 6, "13": 6, "15": 6, "17": 6 };
+  const variables = ["10", "21", "37", "30"];
+  let guard = 0;
+  while (s.length >= 2 && guard++ < 12) {
+    if (s[0] === "\x1d") { s = s.slice(1); continue; }
+    const ai = s.slice(0, 2);
+    if (fijos[ai]) { const v = s.slice(2, 2 + fijos[ai]); if (v.length < fijos[ai]) break; r[ai] = v; s = s.slice(2 + fijos[ai]); }
+    else if (variables.includes(ai)) { const fin = s.indexOf("\x1d", 2); const v = fin < 0 ? s.slice(2) : s.slice(2, fin); r[ai] = v.slice(0, 20); s = fin < 0 ? "" : s.slice(fin + 1); }
+    else break;
+  }
+  return r;
+}
+async function leerCodigos(bitmap) {
+  if (!("BarcodeDetector" in window)) return [];
+  try {
+    const det = new BarcodeDetector({ formats: ["code_128", "ean_13", "ean_8", "data_matrix", "qr_code", "itf", "code_39"] });
+    return (await det.detect(bitmap)).map((c) => c.rawValue).filter(Boolean);
+  } catch { return []; }
+}
+function datosDeCodigos(valores) {
+  const d = { ssccs: [], ean: "", lote: "", caducidad: "" };
+  for (const v of valores) {
+    const dig = normDigitos(v);
+    if (/^\d{18,20}$/.test(dig) && v.replace(/\D/g, "") === v.trim()) d.ssccs.push(dig);
+    const g = parsearGS1(v);
+    if (g["00"]) d.ssccs.push(g["00"]);
+    if (g["01"] || g["02"]) d.ean = g["01"] || g["02"];
+    if (g["10"]) d.lote = g["10"];
+    if (g["17"] || g["15"]) d.caducidad = normFecha(g["17"] || g["15"]);
+    if (/^\d{13}$/.test(v)) d.ean = d.ean || v;
+  }
+  return d;
+}
+function buscarUA(ssccs) {
+  for (const s of ssccs) {
+    for (const a of IDX.articulos.values()) {
+      const f = a.filas.find((f) => f.uaN && f.uaN.length >= 18 && (f.uaN === s || f.uaN.endsWith(s) || s.endsWith(f.uaN)));
+      if (f) return { a, f };
+    }
+  }
+  return null;
+}
+
+// ---------- llamada a la función de Netlify ----------
+const PRECIO = { in: 2 / 1e6, out: 10 / 1e6 }; // Claude Sonnet 5.5, $ por token
+async function api(body) {
+  const r = await fetch("/api/escanear", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-app-code": S.ajustes.codigo || "", "x-dispositivo": S.ajustes.dispositivo || "" },
+    body: JSON.stringify(body),
+  });
+  let j = null;
+  try { j = await r.json(); } catch {}
+  if (!r.ok) throw new Error(j?.error || `Error ${r.status}`);
+  const mes = new Date().toISOString().slice(0, 7);
+  if (S.uso.mes !== mes) S.uso = { mes, llamadas: 0, coste: 0 };
+  S.uso.llamadas++;
+  S.uso.coste += (j.uso?.input_tokens || 0) * PRECIO.in + (j.uso?.output_tokens || 0) * PRECIO.out;
+  guardar("uso");
+  pintarUso();
+  return j.datos;
+}
+
+// createImageBitmap no existe o falla en algunos móviles (iPhone antiguos): se usa una <img> como respaldo
+async function abrirImagen(file) {
+  try { return await createImageBitmap(file); } catch {}
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    return img;
+  } finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
+}
+async function prepararImagen(file) {
+  const bitmap = await abrirImagen(file);
+  const max = 1568;
+  const k = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(bitmap.width * k); c.height = Math.round(bitmap.height * k);
+  c.getContext("2d").drawImage(bitmap, 0, 0, c.width, c.height);
+  const url = c.toDataURL("image/jpeg", 0.85);
+  return { bitmap, url, base64: url.split(",")[1] };
+}
+
+// ---------- flujo de escaneo ----------
+function estado(msg) { const e = $("#estado-escaneo"); e.classList.toggle("hidden", !msg); e.innerHTML = msg || ""; }
+
+async function procesarFoto(file) {
+  if (!file) return;
+  $("#resultado").innerHTML = "";
+  if (!IDX.articulos.size) { estado("Primero carga el Excel de stock en la pestaña Datos."); return; }
+  try {
+    estado("Preparando la foto…");
+    const img = await prepararImagen(file);
+    $("#thumb").src = img.url; $("#thumb").classList.remove("hidden");
+
+    estado("Buscando códigos de barras…");
+    const cod = datosDeCodigos(await leerCodigos(img.bitmap));
+    const porUA = buscarUA(cod.ssccs);
+    if (porUA) {
+      estado("");
+      mostrarResultado({ k: porUA.a.k, confianza: "alta", fuente: "Código de barras (UA)", motivo: `La UA ${porUA.f.ua} está en el stock.`, lectura: { lote: porUA.f.lote, caducidad: porUA.f.cad }, filaUA: porUA.f });
+      return;
+    }
+
+    estado("Leyendo la etiqueta con IA…");
+    const lectura = await api({ accion: "leer", imagen: img.base64, tipo: "image/jpeg" });
+    if (cod.lote) lectura.lote = cod.lote;
+    if (cod.caducidad) lectura.caducidad = cod.caducidad;
+    if (cod.ean) lectura.ean = cod.ean;
+    if (!lectura.legible) { estado("No se lee bien la etiqueta. Prueba con otra foto más cerca y con luz."); return; }
+
+    const rk = rankear(lectura);
+    const top = rk[0], seg = rk[1];
+
+    // 0) código de artículo impreso: si además el nombre o el lote lo respaldan, no hay duda.
+    // Sin ese respaldo no se da por bueno, porque una cifra pudo leerse mal.
+    const kCodigo = lectura.codigo_articulo ? normArt(lectura.codigo_articulo) : "";
+    const porCodigo = kCodigo ? rk.find((x) => x.a.k === kCodigo) : null;
+    if (porCodigo && (porCodigo.nom >= 0.15 || porCodigo.porLote.length)) {
+      estado("");
+      mostrarResultado({ k: porCodigo.a.k, confianza: "alta", fuente: "Código de artículo", motivo: `La etiqueta indica el código de artículo ${lectura.codigo_articulo}.`, lectura, rk });
+      return;
+    }
+    // 1) alias aprendido
+    for (const n of [lectura.nombre_es, ...(lectura.nombres || [])]) {
+      const ak = S.alias[norm(n)];
+      if (ak && IDX.articulos.has(ak)) {
+        estado("");
+        mostrarResultado({ k: ak, confianza: "alta", fuente: "Alias aprendido", motivo: "Ya confirmaste antes este nombre de etiqueta.", lectura, rk });
+        return;
+      }
+    }
+    // 2) lote único o nombre muy claro
+    const conLote = rk.filter((x) => x.porLote.length);
+    if (conLote.length === 1 && conLote[0].nom > 0.25) {
+      estado("");
+      mostrarResultado({ k: conLote[0].a.k, confianza: "alta", fuente: "Lote + nombre", motivo: `El lote ${lectura.lote} coincide con el stock de este artículo.`, lectura, rk });
+      return;
+    }
+    if (top && top.total >= 0.8 && (!seg || top.total - seg.total >= 0.15)) {
+      estado("");
+      mostrarResultado({ k: top.a.k, confianza: top.total >= 1 ? "alta" : "media", fuente: "Parecido de nombre", motivo: "El nombre de la etiqueta se parece claramente al descriptivo.", lectura, rk });
+      return;
+    }
+    // 3) dudoso: que Claude elija entre los candidatos
+    estado("Comparando con los artículos del almacén…");
+    const candidatos = (porCodigo ? [porCodigo, ...rk.filter((x) => x !== porCodigo)] : rk).slice(0, 15).map((x) => ({ articulo: x.a.k, descripcion: x.a.descripcion, lotes: x.a.lotes.slice(0, 6), caducidades: x.a.cads.slice(0, 6) }));
+    const el = await api({ accion: "elegir", lectura, candidatos });
+    estado("");
+    const k = el.articulo && IDX.articulos.has(normArt(el.articulo)) ? normArt(el.articulo) : null;
+    mostrarResultado({ k, confianza: k ? el.confianza : "baja", fuente: "IA (comparación)", motivo: el.motivo, lectura, rk });
+  } catch (e) {
+    const sinRed = e instanceof TypeError; // fetch falla con TypeError cuando no hay conexión
+    estado(`⚠️ ${esc(sinRed ? "No hay conexión con el servidor. Comprueba la cobertura y repite la foto." : e.message)}<br><span class="muted">Mientras tanto puedes usar la búsqueda manual.</span>`);
+  }
+}
+
+function filasTabla(filas, uActual) {
+  if (!filas.length) return `<p class="muted">Sin stock registrado.</p>`;
+  return `<div class="scroll"><table class="tbl"><tr><th>Ubicación</th><th>UA</th><th>Lote</th><th>Cad.</th><th>Cajas</th><th>Sit.</th></tr>${filas
+    .map((f) => `<tr class="${uActual && f.u === uActual ? "here" : ""}"><td>${esc(f.ubicacion)}</td><td class="mono">${esc(f.ua)}</td><td>${esc(f.lote)}</td><td>${esc(verFecha(f.cad))}</td><td>${esc(f.cajas)}</td><td>${caducado(f) ? `<span class="badge bad">${esc(f.situacion || "505")} caducado</span>` : esc(f.situacion)}</td></tr>`)
+    .join("")}</table></div>`;
+}
+
+// Cuántas cajas hay del artículo, en picking y en reserva, y en qué ubicaciones
+const cajasDe = (f) => (f.cajas === "" || f.cajas == null ? 0 : cantidad(f.cajas));
+const nCajas = (n) => `${fmtCant(n)} ${n === 1 ? "caja" : "cajas"}`;
+function resumenStock(a, pk, uActual) {
+  if (!a.filas.length) return `<div class="card stk"><h2>Stock</h2><p class="muted" style="margin:0">No hay stock de este artículo en el Excel cargado.</p></div>`;
+  const suyos = new Set(pk.map(normUbi));
+  const porU = new Map();
+  for (const f of a.filas) {
+    if (!porU.has(f.u)) porU.set(f.u, { u: f.u, ubi: f.ubicacion, picking: esPicking(f.ubicacion), playa: esPlaya(f.ubicacion), cajas: 0, cad505: 0, uas: 0, lotes: new Set(), cads: [], otras: new Set() });
+    const g = porU.get(f.u), c = cajasDe(f);
+    g.cajas += c; g.uas++;
+    if (f.lote) g.lotes.add(f.lote);
+    if (f.cad) g.cads.push(f.cad);
+    if (caducado(f)) g.cad505 += c;
+    else if (!disponible(f)) g.otras.add(f.situacion);
+  }
+  const grupos = [...porU.values()].sort((x, y) => (suyos.has(y.u) - suyos.has(x.u)) || (y.picking - x.picking) || x.u.localeCompare(y.u));
+  const suma = (l) => l.reduce((n, g) => n + g.cajas, 0);
+  const enPick = grupos.filter((g) => g.picking), enRes = grupos.filter((g) => !g.picking);
+  const cad = grupos.reduce((n, g) => n + g.cad505, 0);
+  const tile = (n, txt, ubis, cls = "") => `<div class="tile ${cls}"><b>${fmtCant(n)}</b><span>${txt}${ubis != null ? ` · ${ubis} ${ubis === 1 ? "ubicación" : "ubicaciones"}` : ""}</span></div>`;
+  const fila = (g) => {
+    const tipo = g.picking ? (suyos.has(g.u) ? "Su picking" : "Picking") : g.playa ? "Playa" : "Reserva";
+    const cadMin = g.cads.sort()[0];
+    return `<li class="stk-u${uActual && g.u === uActual ? " aqui" : ""}${g.cad505 ? " cad" : ""}">
+      <div class="stk-cab"><span class="stk-ubi">${esc(g.ubi)}</span><span class="badge ${g.picking ? "ok" : ""}">${tipo}</span>${uActual && g.u === uActual ? ' <span class="badge">Estás aquí</span>' : ""}<b class="stk-cj">${fmtCant(g.cajas)} cj</b></div>
+      <div class="muted">${g.uas} UA${g.lotes.size ? ` · lote ${[...g.lotes].slice(0, 3).map(esc).join(", ")}${g.lotes.size > 3 ? "…" : ""}` : ""}${cadMin ? ` · cad. ${esc(verFecha(cadMin))}` : ""}</div>
+      ${g.cad505 ? `<div class="stk-aviso">⛔ ${fmtCant(g.cad505)} cj caducado (situación 505)</div>` : ""}
+      ${g.otras.size ? `<div class="muted">Situación ${[...g.otras].map(esc).join(", ")}</div>` : ""}</li>`;
+  };
+  return `<div class="card stk">
+    <h2>Stock: ${nCajas(suma(grupos))}</h2>
+    ${cad ? `<div class="verdict bad" style="font-size:15px;margin-top:0">⛔ Hay ${nCajas(cad)} ${cad === 1 ? "caducada" : "caducadas"} (situación 505)</div>` : ""}
+    <div class="tiles" style="margin-bottom:8px">${tile(suma(enPick), "cajas en picking", enPick.length)}${tile(suma(enRes), "cajas en reserva", enRes.length)}${cad ? tile(cad, "cajas caducadas (505)", null, "bad") : ""}</div>
+    <ul class="list">${grupos.map(fila).join("")}</ul>
+  </div>`;
+}
+
+let ULTIMO = null;
+function mostrarResultado(r) {
+  ULTIMO = r;
+  const cont = $("#resultado");
+  const uTxt = completarUbi($("#ubi-actual").value.trim());
+  const uActual = normUbi(uTxt);
+  const lect = r.lectura || {};
+  const leido = [
+    lect.nombre_es && `<b>${esc(lect.nombre_es)}</b>`,
+    lect.nombres?.length && lect.nombres.filter((n) => n !== lect.nombre_es).map(esc).join(" · "),
+    lect.codigo_articulo && `Código de artículo: ${esc(lect.codigo_articulo)}`, lect.lote && `Lote: ${esc(lect.lote)}`, lect.caducidad && `Cad.: ${esc(verFecha(normFecha(lect.caducidad)))}`, lect.ean && `EAN: ${esc(lect.ean)}`,
+  ].filter(Boolean).join("<br>");
+
+  const otros = (r.rk || []).filter((x) => x.a.k !== r.k).slice(0, 8);
+  const listaOtros = otros.length ? `<details><summary>¿No es este? Elegir otro</summary><ul class="list">${otros
+    .map((x) => `<li class="cand"><div><b>${esc(x.a.articulo)}</b> ${esc(x.a.descripcion)}${x.porLote.length ? ' <span class="badge ok">lote</span>' : ""}</div><button class="btn small" data-elegir="${esc(x.a.k)}">Es este</button></li>`)
+    .join("")}</ul></details>` : "";
+  // «Es este»: vale tanto cuando no se ha encontrado nada como en «¿No es este? Elegir otro»
+  const conectarElegir = () => cont.querySelectorAll("[data-elegir]").forEach((b) => b.addEventListener("click", () => {
+    const k = b.dataset.elegir;
+    if (r.lectura?.nombre_es) aprenderAlias(r.lectura, k);
+    mostrarResultado({ ...r, k, filaUA: null, confianza: "alta", fuente: "Elegido a mano", motivo: "Lo has elegido tú." });
+  }));
+
+  if (!r.k) {
+    cont.innerHTML = `<div class="card"><div class="verdict warn">No he encontrado el artículo con seguridad</div><p class="muted">${esc(r.motivo || "")}</p>${leido ? `<h3>Leído en la etiqueta</h3><p>${leido}</p>` : ""}${listaOtros.replace("<details>", "<details open>")}</div>`;
+    conectarElegir();
+    return;
+  }
+
+  const a = IDX.articulos.get(r.k);
+  const pk = IDX.pickingDeArt.get(r.k) || [];
+  const loteN = normLote(lect.lote);
+  let filas = a.filas.slice();
+  const delLote = loteN ? filas.filter((f) => loteCoincide(f.loteN, loteN)) : [];
+  if (r.filaUA) filas = [r.filaUA, ...filas.filter((f) => f !== r.filaUA)];
+
+  const veredicto = bloqueDestino(pk, uTxt, uActual);
+  const enUbi = uActual ? IDX.stockPorUbi.get(uActual) || [] : [];
+  const otrosEnUbi = [...new Set(enUbi.filter((f) => f.k !== r.k).map((f) => f.k))];
+  const puedeAsignar = uActual && !pk.length && !IDX.asignadoPorUbi.get(uActual) && esPicking(uTxt);
+  const conf = { alta: "ok", media: "warn", baja: "bad" }[r.confianza] || "";
+
+  cont.innerHTML = `${veredicto}${resumenStock(a, pk, uActual)}<div class="card">
+    <div class="row" style="justify-content:space-between"><div><span class="badge ${conf}">Confianza ${esc(r.confianza)}</span> <span class="muted">${esc(r.fuente)}</span></div></div>
+    <h2 style="margin-top:10px">${esc(a.articulo)} · ${esc(a.descripcion)}</h2>
+    <p class="muted">${esc(r.motivo || "")}</p>
+    ${otrosEnUbi.length ? `<p class="muted">En ${esc(uTxt)} también hay registrado: ${otrosEnUbi.map((k) => esc(IDX.articulos.get(k).articulo + " " + IDX.articulos.get(k).descripcion)).join("; ")}</p>` : ""}
+    <div class="row" style="margin:10px 0">
+      ${r.lectura?.nombre_es ? `<button class="btn small" id="btn-ok">✔ Es correcto (recordar)</button>` : ""}
+      ${puedeAsignar ? `<button class="btn small" id="btn-asignar">📌 Asignar ${esc(uTxt)} como su picking</button>` : ""}
+    </div>
+    ${leido ? `<details><summary>Leído en la etiqueta</summary><p>${leido}</p></details>` : ""}
+    ${delLote.length ? `<h3>UA con este lote</h3>${filasTabla(delLote, uActual)}` : ""}
+    ${a.filas.length ? `<details><summary>Ver cada UA (${a.filas.length})</summary>${filasTabla(filas, uActual)}</details>` : ""}
+    ${listaOtros}
+  </div>`;
+
+  $("#btn-ok")?.addEventListener("click", () => { aprenderAlias(r.lectura, r.k); toast("Guardado: la próxima vez lo reconoce al momento"); });
+  $("#btn-asignar")?.addEventListener("click", async () => {
+    const asignacion = { articulo: a.articulo, ubicacion: uTxt, descripcion: a.descripcion };
+    if (S.ajustes.codigo) {
+      try { await apiMov({ accion: "asignar", ...asignacion }, "/api/base"); }
+      catch (e) { toast(`No se ha guardado. ${e instanceof TypeError ? "Sin conexión." : e.message}`); return; }
+    }
+    S.maestroManual.push(asignacion);
+    await guardar("maestroManual");
+    construirIndice(); pintarInforme(); pintarPickings(); pintarLibres(); mostrarResultado(r);
+    toast(`${uTxt} asignado a ${a.articulo}`);
+  });
+  conectarElegir();
+  cont.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+const ALMACENES = { "08": "Garcimar Madrid", "01": "Garcimar Barcelona", "02": "Garcimar Málaga" };
+// Al cambiar de almacén se quita todo, para que no se confunda con la foto anterior
+function limpiarEscaneo() {
+  ULTIMO = null;
+  $("#resultado").innerHTML = "";
+  $("#thumb").removeAttribute("src");
+  $("#thumb").classList.add("hidden");
+  $("#buscar").value = "";
+  $("#res-buscar").innerHTML = "";
+  estado("");
+  window.scrollTo(0, 0);
+}
+// Ubicación en grande: fila / hueco / nivel, con el almacén y el tipo de picking en pequeño
+function ubiGrande(u) {
+  const pp = partesUbi(u);
+  const nivel = nivelDe(u);
+  const cuerpo = pp
+    ? `<div class="ubi-codigo">${esc(u)}</div>
+       <div class="ubi-partes"><div class="ubi-parte"><span>Fila</span><b>${esc(pp.fila)}</b></div><div class="ubi-parte"><span>Hueco</span><b>${esc(pp.hueco)}</b></div><div class="ubi-parte"><span>Nivel</span><b>${esc(pp.nivel)}</b></div></div>
+       ${pp.zona ? `<div class="ubi-extra"><b>${esc(ALMACENES[pp.zona] || `Almacén ${pp.zona}`)}</b></div>` : ""}`
+    : `<div class="ubi-entera">${esc(u)}</div>`;
+  return `<div class="destino-ubi">${cuerpo}<div class="ubi-nivel">${nivel === 1 ? "Picking suelo" : nivel ? "Picking altura" : "Picking"}</div></div>`;
+}
+function bloqueDestino(pk, uTxt, uActual) {
+  const vibrar = (p) => { try { navigator.vibrate?.(p); } catch {} };
+  if (!pk.length) {
+    vibrar([60, 40, 60]);
+    return `<div class="destino sin"><div class="destino-ico">⚠️</div><div class="destino-tit">Sin picking asignado</div>
+      <div class="destino-pie">Este artículo no tiene ubicación de picking en el maestro.${uActual && esPicking(uTxt) && !IDX.asignadoPorUbi.get(uActual) ? " Puedes asignarle esta abajo." : ""}</div></div>`;
+  }
+  if (uActual && pk.some((p) => normUbi(p) === uActual)) {
+    vibrar(40);
+    return `<div class="destino aqui"><div class="destino-ico">✅</div><div class="destino-tit">Está en su sitio</div>${ubiGrande(pk.find((p) => normUbi(p) === uActual))}</div>`;
+  }
+  if (uActual) {
+    vibrar([80, 60, 80]);
+    return `<div class="destino mover"><div class="destino-ico">➡️</div><div class="destino-tit">Llévala a su picking</div>${pk.map(ubiGrande).join("")}
+      <div class="destino-pie">Ahora en <s>${esc(uTxt)}</s></div></div>`;
+  }
+  return `<div class="destino info"><div class="destino-ico">📍</div><div class="destino-tit">Su picking</div>${pk.map(ubiGrande).join("")}</div>`;
+}
+function aprenderAlias(lectura, k) {
+  for (const n of [lectura?.nombre_es, ...(lectura?.nombres || [])]) if (n && norm(n)) S.alias[norm(n)] = k;
+  guardar("alias");
+}
+
+// ---------- búsqueda manual ----------
+function buscar(q) {
+  const ul = $("#res-buscar");
+  const t = q.trim();
+  if (t.length < 2) { ul.innerHTML = ""; return; }
+  const n = norm(t), l = normLote(t), d = normDigitos(t);
+  const res = [];
+  for (const a of IDX.articulos.values()) {
+    let p = 0;
+    if (a.k === normArt(t)) p = 3;
+    else if (d.length >= 6 && a.filas.some((f) => f.uaN.includes(d))) p = 2.5;
+    else if (l.length >= 3 && a.lotes.some((x) => x.includes(l))) p = 2;
+    else if (a.nombreN.includes(n)) p = 1.5;
+    else { const s = parecido(t, a.descripcion); if (s > 0.35) p = s; }
+    if (p) res.push([p, a]);
+  }
+  res.sort((x, y) => y[0] - x[0]);
+  ul.innerHTML = res.slice(0, 15).map(([, a]) => `<li class="cand"><div><b>${esc(a.articulo)}</b> ${esc(a.descripcion)}<div class="muted">${a.filas.length} UA · picking: ${esc((IDX.pickingDeArt.get(a.k) || ["—"]).join(" / "))}</div></div><button class="btn small" data-ver="${esc(a.k)}">Ver</button></li>`).join("") || `<li class="muted">Sin resultados</li>`;
+  ul.querySelectorAll("[data-ver]").forEach((b) => b.addEventListener("click", () => {
+    const k = b.dataset.ver;
+    const a = IDX.articulos.get(k);
+    const loteN = normLote(t);
+    const conLote = loteN.length >= 3 ? a.filas.find((f) => f.loteN.includes(loteN)) : null;
+    mostrarResultado({ k, confianza: "alta", fuente: "Búsqueda manual", motivo: "", lectura: conLote ? { lote: conLote.lote } : {} });
+  }));
+}
+
+// ---------- informe ----------
+let MOVS = [];
+function calcularInforme() {
+  const mov = [], mezcla = [], vacios = [];
+  for (const [u, filas] of IDX.stockPorUbi) {
+    if (!esPicking(verUbi(u))) continue;
+    const arts = [...new Set(filas.map((f) => f.k))];
+    // un picking puede estar asignado a varios artículos: ninguno de ellos es un intruso aquí
+    const asignados = IDX.asignadosDeUbi.get(u);
+    const asign = IDX.asignadoPorUbi.get(u);
+    const intrusos = asignados ? arts.filter((k) => !asignados.has(k)) : (IDX.hayMaestro ? arts.filter((k) => (IDX.pickingDeArt.get(k) || []).length) : []);
+    if (arts.length > 1 || intrusos.length) mezcla.push({ u, arts, asign, intrusos });
+    for (const f of filas) {
+      if (!intrusos.includes(f.k)) continue;
+      // nunca se manda al mismo picking del que sale
+      const destinos = (IDX.pickingDeArt.get(f.k) || []).filter((d) => normUbi(d) !== u);
+      let estadoDest = "Sin picking asignado";
+      if (destinos.length) {
+        const ud = normUbi(destinos[0]);
+        const enDest = IDX.stockPorUbi.get(ud) || [];
+        if (!enDest.length) estadoDest = IDX.vacias.has(ud) ? "Destino vacío" : "Destino sin stock registrado";
+        else if (enDest.every((x) => x.k === f.k)) estadoDest = "Juntar con su stock";
+        else estadoDest = "Destino también ocupado por otro artículo";
+      }
+      mov.push({ f, desde: verUbi(u), destino: destinos.join(" / ") || "¿?", estadoDest });
+    }
+  }
+  for (const [u, asignados] of IDX.asignadosDeUbi) for (const k of asignados) {
+    const filas = IDX.stockPorUbi.get(u) || [];
+    if (filas.some((f) => asignados.has(f.k))) continue; // tiene alguno de sus artículos
+    const a = IDX.articulos.get(k);
+    // primero los palets disponibles, y dentro de ellos la caducidad más cercana
+    const reserva = (a?.filas || []).filter((f) => !esPicking(f.ubicacion))
+      .sort((x, y) => disponible(y) - disponible(x) || (x.cad || "9").localeCompare(y.cad || "9"));
+    vacios.push({ u, k, ocupado: [...new Set(filas.map((f) => f.k))], reserva });
+  }
+  mov.sort((x, y) => normUbi(x.desde).localeCompare(normUbi(y.desde)));
+  mezcla.sort((x, y) => x.u.localeCompare(y.u));
+  vacios.sort((x, y) => x.u.localeCompare(y.u));
+  return { mov, mezcla, vacios };
+}
+const nomArt = (k) => { const a = IDX.articulos.get(k); return a ? `${a.articulo} ${a.descripcion}` : k; };
+const LIM = 300;
+// ---------- servidor ----------
+// La pestaña Movimientos ya no existe. Si a un móvil le quedaba algo anotado sin enviar, se envía igualmente.
+let ERROR_ENVIO = "", enviando = false, timerEnvio = null;
+async function apiMov(body, ruta = "/api/movimientos") {
+  const r = await fetch(ruta, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-app-code": S.ajustes.codigo || "", "x-dispositivo": S.ajustes.dispositivo || "" },
+    body: JSON.stringify(body),
+  });
+  let j = null;
+  try { j = await r.json(); } catch {}
+  if (!r.ok) throw Object.assign(new Error(j?.error || `Error ${r.status}`), { status: r.status });
+  return j;
+}
+async function enviarCola() {
+  if (enviando || !S.colaEv.length) return;
+  enviando = true;
+  clearTimeout(timerEnvio);
+  ERROR_ENVIO = "";
+  try {
+    while (S.colaEv.length) {
+      const lote = S.colaEv.slice(0, 50);
+      await apiMov({ accion: "eventos", eventos: lote });
+      const enviados = new Set(lote.map((e) => e.ev));
+      S.colaEv = S.colaEv.filter((e) => !enviados.has(e.ev));
+      await guardar("colaEv");
+    }
+  } catch (e) {
+    ERROR_ENVIO = e instanceof TypeError ? "Sin conexión." : e.message;
+    // con un código incorrecto no sirve reintentar: espera a que se corrija en Ajustes
+    if (e.status !== 401) timerEnvio = setTimeout(enviarCola, 30000);
+  } finally {
+    enviando = false;
+  }
+}
+// El sistema del almacén solo reconoce la ubicación con 99 delante y sin guiones
+const codigoSistema = (u) => { const n = normUbi(u); return !n || /^99\d{10}$/.test(n) ? n : "99" + n; };
+function pintarRol() {
+  // el traspaso por bases y los pickings con varios artículos son solo del responsable
+  $("#nav-traspaso").classList.toggle("hidden", !S.ajustes.responsable);
+  $("#card-traspaso").classList.toggle("hidden", !S.ajustes.responsable);
+  $("#nav-pick").classList.toggle("hidden", !S.ajustes.responsable);
+  if (!S.ajustes.responsable && $("#tab-pickings").classList.contains("on")) document.querySelector('nav button[data-tab="escanear"]').click();
+  pintarCargas(); pintarBase(); pintarAjustes();
+}
+async function comprobarRol() {
+  if (!S.ajustes.codigo) { if (S.ajustes.responsable) { S.ajustes.responsable = false; await guardar("ajustes"); pintarRol(); } return; }
+  try {
+    const r = await fetch("/api/escanear", { method: "POST", headers: { "content-type": "application/json", "x-app-code": S.ajustes.codigo }, body: JSON.stringify({ accion: "comprobar" }) });
+    if (r.status !== 401 && !r.ok) return;
+    const j = r.ok ? await r.json() : {};
+    if (!!j.responsable !== S.ajustes.responsable) { S.ajustes.responsable = !!j.responsable; await guardar("ajustes"); pintarRol(); }
+  } catch {} // sin conexión se mantiene lo último que se supo
+}
+async function copiar(t) {
+  try { await navigator.clipboard.writeText(t); }
+  catch {
+    const a = document.createElement("textarea");
+    a.value = t; document.body.appendChild(a); a.select();
+    try { document.execCommand("copy"); } finally { a.remove(); }
+  }
+  toast(`Copiado: ${t}`);
+}
+// ---------- base compartida ----------
+// El responsable carga los Excel y los ajustes; los demás dispositivos descargan lo que cambia.
+// Cada uno guarda su copia, así que sin cobertura se sigue trabajando con la última.
+const TIPOS_BASE = ["stock", "maestro", "vacias", "tipos", "ajustes"];
+const soloLectura = () => !!S.ajustes.codigo && !S.ajustes.responsable;
+const BASE = { metas: null, comprobada: 0, error: "" };
+const datosBase = (t) => t === "tipos" ? { mapa: S.tiposUbi } : t === "ajustes" ? { niveles: S.ajustes.niveles, digitos: S.ajustes.digitos, playa: S.ajustes.playa ?? PLAYA_DEF } : S[t];
+const hayDatos = (t) => (t === "tipos" ? Object.keys(S.tiposUbi || {}).length > 0 : !!datosBase(t));
+async function aplicarBase(t, datos) {
+  if (t === "tipos") { S.tiposUbi = datos.mapa || {}; await guardar("tiposUbi"); }
+  else if (t === "ajustes") { S.ajustes.niveles = datos.niveles ?? S.ajustes.niveles; S.ajustes.digitos = datos.digitos ?? S.ajustes.digitos; S.ajustes.playa = datos.playa ?? S.ajustes.playa; await guardar("ajustes"); }
+  else { S[t] = datos; await guardar(t); }
+}
+async function pasoBase() {
+  if (!S.ajustes.codigo) return;
+  try {
+    if (S.ajustes.responsable) {
+      while (S.basePend.length) {
+        const t = S.basePend[0];
+        const datos = datosBase(t);
+        if (datos) {
+          if (JSON.stringify(datos).length > 5.5e6) throw new Error(`El archivo de ${t} es demasiado grande para compartirlo.`);
+          S.baseVer[t] = (await apiMov({ accion: "subir", almacen: S.ajustes.zona, tipo: t, datos }, "/api/base")).version;
+          await guardar("baseVer");
+        }
+        S.basePend.shift();
+        await guardar("basePend");
+      }
+    } else if (S.basePend.length) { S.basePend = []; await guardar("basePend"); }
+    // las asignaciones hechas antes de existir la base compartida se suben una vez
+    if (!S.ajustes.asigMigradas) {
+      for (const m of S.maestroManual) await apiMov({ accion: "asignar", ...m }, "/api/base");
+      S.ajustes.asigMigradas = true;
+      await guardar("ajustes");
+    }
+    const r = await apiMov({ accion: "estado", almacen: S.ajustes.zona }, "/api/base");
+    BASE.metas = r.metas;
+    let cambios = false;
+    for (const t of TIPOS_BASE) {
+      const meta = r.metas[t];
+      if (!meta || meta.version === S.baseVer[t]) continue;
+      const d = await apiMov({ accion: "descargar", almacen: S.ajustes.zona, tipo: t }, "/api/base");
+      if (!d.datos) continue;
+      await aplicarBase(t, d.datos);
+      S.baseVer[t] = meta.version;
+      await guardar("baseVer");
+      cambios = true;
+    }
+    if (JSON.stringify(r.asignaciones) !== JSON.stringify(S.maestroManual)) {
+      S.maestroManual = r.asignaciones;
+      await guardar("maestroManual");
+      cambios = true;
+    }
+    BASE.error = "";
+    BASE.comprobada = Date.now();
+    if (cambios) { aplicarTema(); refrescar(); toast("Base de datos actualizada"); }
+  } catch (e) {
+    BASE.error = e instanceof TypeError ? "Sin conexión: se usa la última copia de este dispositivo." : e.message;
+  }
+  pintarBase();
+}
+// Las sincronizaciones van una detrás de otra, para que una subida y una descarga no se crucen
+let colaBase = Promise.resolve();
+const sincronizarBase = () => (colaBase = colaBase.then(pasoBase));
+async function subirBase(tipos) {
+  for (const t of tipos) if (!S.basePend.includes(t)) S.basePend.push(t);
+  await guardar("basePend");
+  await sincronizarBase();
+}
+// ---------- elegir almacén ----------
+const nombreAlmacen = (z) => ALMACENES[z] || `Almacén ${z}`;
+function pintarAlmacen() {
+  $("#btn-almacen").textContent = `📍 ${nombreAlmacen(S.ajustes.zona)} ▾`;
+  $("#aj-almacen").textContent = nombreAlmacen(S.ajustes.zona);
+  $("#ubi-actual").placeholder = `Ej. ${S.ajustes.zona}-01-004-01-1`;
+}
+function mostrarElegir(conCancelar) {
+  const box = $("#elegir-lista");
+  box.innerHTML = Object.entries(ALMACENES).map(([z, n]) => `<button data-almacen="${esc(z)}" class="${z === S.ajustes.zona ? "ultimo" : ""}">${esc(n)}</button>`).join("")
+    + (conCancelar ? `<button class="cancelar" data-cancelar="1">Cancelar</button>` : "");
+  $("#elegir-almacen").classList.remove("hidden");
+}
+// Va en la misma cola que la sincronización, para que una descarga en curso no acabe guardada en el otro almacén
+const cambiarAlmacen = (z) => (colaBase = colaBase.then(async () => {
+  if (z !== S.ajustes.zona) {
+    S.ajustes.zona = z;
+    await guardar("ajustes");
+    await cargarAlmacen();
+    BASE.metas = null; BASE.comprobada = 0; BASE.error = "";
+    limpiarEscaneo();
+    $("#ubi-actual").value = "";
+    try { localStorage.removeItem("ubiActual"); } catch {}
+    $("#mapeo").style.display = "none";
+    refrescar();
+  }
+  await pasoBase();
+}));
+function pintarBase() {
+  const box = $("#base-estado");
+  if (!S.ajustes.codigo) { box.innerHTML = ""; return; }
+  const faltan = BASE.metas ? TIPOS_BASE.filter((t) => !BASE.metas[t] && hayDatos(t)) : [];
+  const ofrecer = S.ajustes.responsable && !S.basePend.length && faltan.length;
+  const hora = BASE.comprobada ? new Date(BASE.comprobada).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : "";
+  const linea = BASE.error ? `🔴 ${esc(BASE.error)}`
+    : S.basePend.length ? "⏳ Compartiendo con todos…"
+    : BASE.metas && !["stock", "maestro", "vacias"].some((t) => BASE.metas[t]) ? `⚠️ Todavía no hay base compartida de ${esc(nombreAlmacen(S.ajustes.zona))}.`
+    : hora ? `🟢 Base compartida al día · comprobada a las ${hora}` : "Comprobando la base compartida…";
+  box.innerHTML = `<div class="status" style="margin-bottom:8px">${linea}</div>
+    <div class="row">${ofrecer ? `<button class="btn small primary" id="btn-compartir">Compartir con todos lo de este dispositivo</button>` : ""}<button class="btn small" id="btn-comprobar">Comprobar ahora</button></div>`;
+  $("#btn-comprobar").addEventListener("click", sincronizarBase);
+  $("#btn-compartir")?.addEventListener("click", async () => { await subirBase(faltan); if (!BASE.error) toast("Compartido con todos los dispositivos"); });
+}
+function pintarInforme() {
+  const { mov, mezcla, vacios } = calcularInforme();
+  MOVS = mov;
+  const f = norm($("#filtro-informe").value);
+  const pasa = (...t) => !f || t.some((x) => norm(x).includes(f));
+  const hayStock = IDX.articulos.size && S.stock;
+
+  $("#tiles").innerHTML = [
+    [mov.length, "movimientos a hacer"], [mezcla.length, "pickings con problemas"], [vacios.length, "pickings sin su artículo"],
+  ].map(([n, t]) => `<div class="tile"><b>${n}</b><span>${t}</span></div>`).join("");
+
+  if (!hayStock) { ["#inf-mov", "#inf-mezcla", "#inf-vacios"].forEach((s) => ($(s).innerHTML = `<p class="muted">Carga el Excel de stock.</p>`)); return; }
+  const sinMaestro = !IDX.hayMaestro ? `<p class="muted">⚠️ Sin maestro de picking solo puedo detectar mezclas de artículos, no adónde va cada uno.</p>` : "";
+
+  const m1 = mov.filter((m) => pasa(m.desde, m.destino, m.f.articulo, m.f.descripcion, m.f.ua));
+  $("#inf-mov").innerHTML = sinMaestro + (m1.length ? `<ul class="list">${m1.slice(0, LIM).map((m) => `<li>
+      <div><b>${esc(m.desde)}</b> → <b>${esc(m.destino)}</b> <span class="badge ${m.estadoDest.startsWith("Destino también") ? "bad" : m.estadoDest.startsWith("Sin") ? "warn" : "ok"}">${esc(m.estadoDest)}</span></div>
+      <div>${esc(m.f.articulo)} · ${esc(m.f.descripcion)}</div>
+      <div class="muted mono">UA ${esc(m.f.ua)} · lote ${esc(m.f.lote)} · ${esc(m.f.cajas)} cajas</div></li>`).join("")}</ul>${m1.length > LIM ? `<p class="muted">Mostrando ${LIM} de ${m1.length}. Exporta a Excel para verlos todos.</p>` : ""}` : `<p class="muted">Nada que mover 👍</p>`);
+
+  const m2 = mezcla.filter((m) => pasa(verUbi(m.u), ...m.arts.map(nomArt)));
+  $("#inf-mezcla").innerHTML = m2.length ? `<ul class="list">${m2.slice(0, LIM).map((m) => `<li>
+      <div><b>${esc(verUbi(m.u))}</b> ${m.arts.length > 1 ? `<span class="badge bad">${m.arts.length} artículos</span>` : ""} ${m.intrusos.length ? `<span class="badge warn">${m.intrusos.length} fuera de sitio</span>` : ""}</div>
+      <div class="muted">Asignado: ${m.asign ? esc(nomArt(m.asign)) : "— sin asignar en el maestro —"}</div>
+      <div>${m.arts.map((k) => `${m.intrusos.includes(k) ? "❌" : "✅"} ${esc(nomArt(k))}`).join("<br>")}</div></li>`).join("")}</ul>` : `<p class="muted">Ningún picking mezclado 👍</p>`;
+
+  const m3 = vacios.filter((v) => pasa(verUbi(v.u), nomArt(v.k)));
+  $("#inf-vacios").innerHTML = IDX.hayMaestro ? (m3.length ? `<ul class="list">${m3.slice(0, LIM).map((v) => `<li>
+      <div><b>${esc(verUbi(v.u))}</b> · ${esc(nomArt(v.k))}</div>
+      ${v.ocupado.length ? `<div class="muted">Ocupado por: ${v.ocupado.map((k) => esc(nomArt(k))).join("; ")}</div>` : ""}
+      <div class="muted">${v.reserva.length ? `Reponer desde: ${v.reserva.slice(0, 3).map((f) => `${esc(f.ubicacion)} (lote ${esc(f.lote)}, cad. ${esc(verFecha(f.cad))}${disponible(f) ? "" : caducado(f) ? `, <b style="color:var(--bad)">caducado</b>` : `, <b style="color:var(--bad)">sit. ${esc(f.situacion)}</b>`})`).join(", ")}` : "Sin palets en reserva"}</div></li>`).join("")}</ul>` : `<p class="muted">Todos los pickings tienen su artículo 👍</p>`) : `<p class="muted">Necesito el maestro de picking.</p>`;
+}
+function exportarMovimientos() {
+  if (!MOVS.length) { toast("No hay movimientos"); return; }
+  const filas = MOVS.map((m) => ({ "Desde": m.desde, "Hacia": m.destino, "Estado destino": m.estadoDest, "Artículo": m.f.articulo, "Descriptivo": m.f.descripcion, "UA": m.f.ua, "Lote": m.f.lote, "Caducidad": verFecha(m.f.cad), "Cajas": m.f.cajas, "Situación": m.f.situacion }));
+  descargarExcel(filas, "Movimientos", `movimientos_picking_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+function descargarExcel(filas, hoja, nombre) {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), hoja);
+  XLSX.writeFile(wb, nombre);
+}
+
+// ---------- carga de Excel ----------
+function pintarCargas() {
+  const lectura = soloLectura();
+  $("#datos-titulo").textContent = lectura ? "Base de datos" : "Cargar Excel";
+  const nombre = nombreAlmacen(S.ajustes.zona);
+  $("#datos-intro").textContent = lectura ? `La de ${nombre} la carga el responsable y se actualiza sola en este dispositivo.`
+    : S.ajustes.codigo ? `Lo que cargues aquí se guarda como la base de ${nombre} y se comparte con todos los dispositivos. Cada almacén tiene la suya. Al cargar un archivo te pediré que confirmes qué columna es cada cosa (se recuerda para la próxima vez).`
+    : "Los datos se guardan solo en este dispositivo. Al cargar un archivo te pediré que confirmes qué columna es cada cosa (se recuerda para la próxima vez).";
+  $("#card-ejemplo").classList.toggle("hidden", !!S.ajustes.codigo);
+  $("#cargas").innerHTML = Object.entries(TIPOS).map(([t, def]) => {
+    const d = S[t];
+    return `<div style="border-top:1px solid var(--line);padding:12px 0">
+      <div class="row" style="justify-content:space-between"><div><b>${def.titulo}</b>${t === "stock" ? "" : ' <span class="muted">(opcional)</span>'}<div class="muted">${def.desc}</div>
+      <div class="muted">${d ? `✅ ${S.ajustes.zona ? `${d.filas.filter((f) => enZona(f.ubicacion)).length} filas de ${esc(nombre)} (de ${d.filas.length})` : `${d.filas.length} filas`} · ${esc(d.archivo)} · ${new Date(d.fecha).toLocaleString("es-ES")}` : "Sin cargar"}</div></div>
+      ${lectura ? "" : `<label class="btn small" style="flex:0 0 auto">📂 Cargar<input type="file" class="hidden" data-tipo="${t}" accept=".xlsx,.xls,.xlsm,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"></label>`}</div></div>`;
+  }).join("");
+  $("#cargas").querySelectorAll("input[type=file]").forEach((i) => i.addEventListener("change", (e) => leerExcel(e.target.dataset.tipo, e.target.files[0])));
+}
+
+async function leerExcel(tipo, file) {
+  if (!file) return;
+  try {
+    const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true });
+    const hojas = wb.SheetNames;
+    const abrir = (nombreHoja) => {
+      const filas = XLSX.utils.sheet_to_json(wb.Sheets[nombreHoja], { header: 1, raw: true, defval: "" });
+      const hr = filaCabecera(filas);
+      const cab = (filas[hr] || []).map((h, i) => String(h).trim() || `Columna ${i + 1}`);
+      mostrarMapeo(tipo, file.name, hojas, nombreHoja, cab, filas.slice(hr + 1), abrir);
+    };
+    abrir(hojas[0]);
+  } catch (e) {
+    toast("No he podido leer el archivo: " + e.message);
+  }
+}
+
+function mostrarMapeo(tipo, archivo, hojas, hoja, cab, datos, abrir) {
+  const def = TIPOS[tipo];
+  const mapeo = adivinarMapeo(tipo, cab, S.mapeos[tipo]);
+  const box = $("#mapeo");
+  box.style.display = "block";
+  box.innerHTML = `<h2>${def.titulo}: ¿qué columna es cada cosa?</h2>
+    <p class="muted">${esc(archivo)} · ${datos.length} filas. He intentado adivinarlo; corrige lo que esté mal.</p>
+    ${hojas.length > 1 ? `<label class="f">Hoja</label><select id="map-hoja">${hojas.map((h) => `<option ${h === hoja ? "selected" : ""}>${esc(h)}</option>`).join("")}</select>` : ""}
+    <div class="map-grid" style="margin-top:10px">${def.campos.map(([c, nombre, req]) => `<label for="map-${c}">${nombre}${req ? " *" : ""}</label>
+      <select id="map-${c}" data-campo="${c}"><option value="">— no está —</option>${cab.map((h, i) => `<option value="${i}" ${mapeo[c] === i ? "selected" : ""}>${esc(h)}</option>`).join("")}</select>`).join("")}</div>
+    <h3>Vista previa</h3><div class="scroll" id="map-prev"></div>
+    <div class="row" style="margin-top:12px"><button class="btn primary" id="map-ok">Guardar ${def.titulo}</button><button class="btn" id="map-cancel">Cancelar</button></div>`;
+
+  const leerMapeo = () => { const m = {}; box.querySelectorAll("select[data-campo]").forEach((s) => { if (s.value !== "") m[s.dataset.campo] = +s.value; }); return m; };
+  const convertir = (m) => datos.map((fila) => {
+    const o = {};
+    for (const [c] of def.campos) o[c] = m[c] != null ? fila[m[c]] : "";
+    if (o.caducidad instanceof Date || typeof o.caducidad === "number") o.caducidad = normFecha(o.caducidad);
+    for (const c of Object.keys(o)) if (o[c] instanceof Date) o[c] = normFecha(o[c]);
+    // Excel guarda la ubicación 0807023011 como el número 807023011: se le devuelve el cero
+    if (typeof o.ubicacion === "number" && Number.isInteger(o.ubicacion) && String(o.ubicacion).length <= 10) o.ubicacion = String(o.ubicacion).padStart(10, "0");
+    return o;
+  }).filter((o) => def.campos.every(([c, , req]) => !req || String(o[c]).trim() !== ""));
+  const prev = () => {
+    const m = leerMapeo();
+    const filas = convertir(m).slice(0, 4);
+    $("#map-prev").innerHTML = `<table class="tbl"><tr>${def.campos.map(([, n]) => `<th>${n}</th>`).join("")}</tr>${filas.map((o) => `<tr>${def.campos.map(([c]) => `<td>${esc(o[c])}</td>`).join("")}</tr>`).join("")}</table>`;
+  };
+  box.querySelectorAll("select[data-campo]").forEach((s) => s.addEventListener("change", prev));
+  $("#map-hoja")?.addEventListener("change", (e) => abrir(e.target.value));
+  prev();
+  $("#map-cancel").addEventListener("click", () => (box.style.display = "none"));
+  $("#map-ok").addEventListener("click", async () => {
+    const m = leerMapeo();
+    const falta = def.campos.filter(([c, , req]) => req && m[c] == null).map(([, n]) => n);
+    if (falta.length) { toast("Falta indicar: " + falta.join(", ")); return; }
+    const filas = convertir(m);
+    // que un Excel no acabe en el almacén equivocado
+    const delAlmacen = filas.filter((f) => enZona(f.ubicacion)).length;
+    const nombreAlm = nombreAlmacen(S.ajustes.zona);
+    if (!delAlmacen) { toast(`Este Excel no tiene ubicaciones de ${nombreAlm}. Comprueba el almacén elegido.`); return; }
+    if (tipo !== "vacias" && delAlmacen < filas.length / 2 && !confirm(`Solo ${delAlmacen} de ${filas.length} filas son de ${nombreAlm}. ¿Seguro que este Excel es de este almacén?`)) return;
+    S[tipo] = { filas, archivo, fecha: Date.now() };
+    // el tipo de una ubicación no cambia: se recuerda aunque luego deje de estar vacía
+    for (const f of filas) { const t = tipoEsPicking(f.tipo); if (t !== null) S.tiposUbi[normUbi(f.ubicacion)] = t; }
+    await guardar("tiposUbi");
+    S.mapeos[tipo] = Object.fromEntries(Object.entries(m).map(([c, i]) => [c, cab[i]]));
+    await guardar(tipo); await guardar("mapeos");
+    box.style.display = "none";
+    refrescar();
+    toast(`${def.titulo}: ${filas.length} filas cargadas`);
+    if (S.ajustes.responsable) {
+      await subirBase(tipo === "vacias" ? ["vacias", "tipos"] : [tipo]);
+      toast(BASE.error ? `Guardado aquí, pero sin compartir: ${BASE.error}` : `${def.titulo}: compartido con todos`);
+    }
+  });
+  box.scrollIntoView({ behavior: "smooth" });
+}
+
+// ---------- datos de ejemplo ----------
+function datosEjemplo() {
+  const arts = [
+    ["1001", "GAMBA BLANCA CONG 1KG", "01-001-1"], ["1002", "CALAMAR ANILLAS REBOZ 500G", "01-002-1"], ["1003", "MERLUZA FILETE S/P 5KG", "01-003-1"],
+    ["1004", "GUISANTES FINOS CONG 2,5KG", "01-004-1"], ["1005", "PATATAS PREFRITAS 4X2,5KG", "01-005-1"], ["1006", "LANGOSTINO COCIDO 40/60 800G", "01-001-2"],
+    ["1007", "PIZZA MARGARITA 3X350G", "01-002-2"], ["1008", "HELADO VAINILLA 5L", "01-003-2"],
+  ];
+  let n = 1234567890123;
+  const ua = () => "00385" + String(n++).padStart(15, "0");
+  const fila = (a, ubi, lote, cad, cajas, sit = "100") => ({ articulo: a, descripcion: arts.find((x) => x[0] === a)[1], lote, caducidad: cad, cajas, ua: ua(), situacion: sit, entrada: "E" + (500 + (n % 50)), ubicacion: ubi });
+  const stock = [
+    fila("1001", "01-001-1", "L24187A", "2027-06-30", 12), fila("1003", "01-001-1", "MF2409", "2027-03-15", 6), fila("1007", "01-001-1", "PZ7781", "2027-01-20", 20),
+    fila("1002", "01-002-1", "CA1102", "2027-04-10", 15), fila("1005", "01-004-1", "PT0925", "2027-09-01", 30), fila("1004", "01-004-1", "GU5531", "2027-11-30", 8),
+    fila("1006", "01-001-2", "LC4060", "2027-02-28", 10), fila("1008", "01-002-2", "HV0042", "2027-08-15", 4), fila("1007", "01-003-2", "PZ7790", "2027-02-10", 18),
+    fila("1005", "02-010-3", "PT0931", "2027-10-05", 60), fila("1005", "02-010-4", "PT0940", "2027-10-20", 60), fila("1003", "02-011-3", "MF2415", "2027-04-01", 40),
+    fila("1008", "02-012-3", "HV0050", "2027-09-30", 24, "400"), fila("1001", "02-013-4", "L24201B", "2027-07-15", 48),
+  ];
+  const maestro = arts.map(([articulo, descripcion, ubicacion]) => ({ articulo, descripcion, ubicacion }));
+  const vacias = [{ ubicacion: "01-005-1" }, { ubicacion: "01-003-1" }, { ubicacion: "02-014-3" }, { ubicacion: "02-014-4" }];
+  // pasar al formato real del almacén: fila-hueco-nivel -> 08-FF-HHH-NN-1
+  const real = (u) => { const [f, h, n] = u.split("-"); return `${S.ajustes.zona}-${f}-${h}-0${n}-1`; };
+  for (const x of [...stock, ...maestro, ...vacias]) x.ubicacion = real(x.ubicacion);
+  return { stock, maestro, vacias };
+}
+
+// ---------- ajustes y arranque ----------
+function aplicarTema() { if (S.ajustes.tema) document.documentElement.dataset.theme = S.ajustes.tema; else delete document.documentElement.dataset.theme; }
+function pintarUso() {
+  const mes = new Date().toISOString().slice(0, 7);
+  const u = S.uso.mes === mes ? S.uso : { llamadas: 0, coste: 0 };
+  $("#aj-uso").textContent = `Este mes: ${u.llamadas} llamadas a la IA · coste aproximado ${u.coste.toFixed(2)} $ (desde este móvil).`;
+  const box = $("#aj-uso-todos");
+  box.classList.toggle("hidden", !S.ajustes.responsable);
+  if (S.ajustes.responsable && !box.innerHTML) box.innerHTML = `<button class="btn small" id="btn-uso-todos">Ver dispositivos y coste de todos</button>`;
+}
+// Solo el responsable: cuántos dispositivos usan la app y lo que cuesta la IA sumando todos (lo guarda el servidor)
+const ACTIVO_DIAS = 30;
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const nombreMes = (m) => { const [a, n] = String(m).split("-"); return `${MESES[Number(n) - 1] || m} ${a || ""}`.trim(); };
+const dolares = (x) => `${(x || 0).toFixed(2)} $`;
+function haceCuanto(t, ahora) {
+  if (!t) return "—";
+  const min = Math.max(0, Math.round((ahora - t) / 60000));
+  if (min < 2) return "ahora";
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `hace ${h} h`;
+  const d = Math.round(h / 24);
+  return d === 1 ? "ayer" : `hace ${d} días`;
+}
+async function verUsoTodos() {
+  const box = $("#aj-uso-todos");
+  box.innerHTML = `<p class="muted">Consultando el servidor…</p>`;
+  let r;
+  try { r = await apiMov({ accion: "uso" }, "/api/base"); }
+  catch (e) { box.innerHTML = `<p class="muted">No se ha podido consultar: ${esc(e.message)}</p><button class="btn small" id="btn-uso-todos">Reintentar</button>`; return; }
+  const limite = r.ahora - ACTIVO_DIAS * 864e5;
+  const lista = r.dispositivos.filter((d) => d.ultimo >= limite || d.llamadas > 0).sort((a, b) => b.coste - a.coste || b.ultimo - a.ultimo);
+  const antiguos = r.dispositivos.length - lista.length;
+  const filas = lista.map((d) => `<tr${d.id === S.ajustes.dispositivo ? ' class="here"' : ""}>
+      <td style="white-space:normal"><b>${esc(d.movil || "¿?")}</b>${d.id === S.ajustes.dispositivo ? " (este)" : ""}<br><span class="muted">${esc(d.equipo || "—")}${d.almacen ? " · " + esc(ALMACENES[d.almacen] || d.almacen) : ""}</span></td>
+      <td>${haceCuanto(d.ultimo, r.ahora)}</td><td>${d.llamadas}</td><td>${dolares(d.coste)}</td></tr>`).join("");
+  box.innerHTML = `<div class="tiles" style="margin-top:12px">
+      <div class="tile"><b>${lista.length}</b><span>dispositivos usando la app (últimos ${ACTIVO_DIAS} días)</span></div>
+      <div class="tile"><b>${dolares(r.total.coste)}</b><span>coste de la IA en ${nombreMes(r.mes)}, todos juntos · ${r.total.llamadas} llamadas</span></div>
+      <div class="tile"><b>${dolares(r.anterior.coste)}</b><span>${nombreMes(r.anterior.mes)} · ${r.anterior.llamadas} llamadas</span></div>
+    </div>
+    ${lista.length ? `<table class="tbl"><tr><th>Dispositivo</th><th>Último uso</th><th>Llamadas</th><th>Coste</th></tr>${filas}</table>` : `<p class="muted">Todavía no hay dispositivos anotados.</p>`}
+    <p class="muted">Coste aproximado con el precio de Claude Sonnet 5.5; la factura exacta está en la consola de Anthropic. Se cuenta desde que se subió esta versión.
+    ${antiguos ? ` ${antiguos > 1 ? `No salen ${antiguos} dispositivos` : "No sale 1 dispositivo"} sin uso en ${ACTIVO_DIAS} días.` : ""}
+    Un móvil que reinstale la app o borre sus datos sale como dispositivo nuevo.</p>
+    <button class="btn small" id="btn-uso-todos">Actualizar</button>`;
+}
+$("#aj-uso-todos").addEventListener("click", (e) => { if (e.target.id === "btn-uso-todos") verUsoTodos(); });
+// Código de acceso: una vez guardado no se vuelve a mostrar. Para cambiarlo hay que saber el actual.
+function pintarCodigo(paso = "") {
+  const box = $("#ia-codigo");
+  const campo = (id, txt) => `<label class="f" for="${id}">${txt}</label><input type="password" id="${id}" autocomplete="new-password" autocapitalize="off" spellcheck="false">`;
+  if (S.ajustes.codigo && paso === "") {
+    box.innerHTML = `<p>🔒 <b>Código de acceso configurado</b> en este móvil.</p><button class="btn small" id="cod-cambiar">Cambiar código</button>`;
+    $("#cod-cambiar").addEventListener("click", () => pintarCodigo("verificar"));
+    return;
+  }
+  if (paso === "verificar") {
+    box.innerHTML = `${campo("cod-actual", "Escribe el código actual")}<div class="row" style="margin-top:10px"><button class="btn small primary" id="cod-ok">Continuar</button><button class="btn small" id="cod-cancel">Cancelar</button></div>`;
+    $("#cod-actual").focus();
+    $("#cod-cancel").addEventListener("click", () => pintarCodigo());
+    $("#cod-ok").addEventListener("click", () => {
+      if ($("#cod-actual").value !== S.ajustes.codigo) { toast("Código incorrecto"); $("#cod-actual").value = ""; return; }
+      pintarCodigo("nuevo");
+    });
+    return;
+  }
+  box.innerHTML = `${campo("cod-nuevo", "Código de acceso (uno de los que pongas en Netlify como APP_CODE)")}
+    <p class="muted">Una vez guardado no se puede ver, solo cambiar sabiendo el actual.</p>
+    <div class="row" style="margin-top:10px"><button class="btn small primary" id="cod-guardar">Guardar código</button>
+    ${S.ajustes.codigo ? `<button class="btn small" id="cod-quitar">Quitar código</button><button class="btn small" id="cod-cancel">Cancelar</button>` : ""}</div>`;
+  $("#cod-cancel")?.addEventListener("click", () => pintarCodigo());
+  $("#cod-quitar")?.addEventListener("click", async () => { S.ajustes.codigo = ""; S.ajustes.responsable = false; await guardar("ajustes"); pintarCodigo(); pintarRol(); toast("Código quitado"); });
+  $("#cod-guardar").addEventListener("click", async () => {
+    const nuevo = $("#cod-nuevo").value.trim();
+    if (!nuevo) { toast("Escribe el código"); return; }
+    const b = $("#cod-guardar"); b.disabled = true; b.textContent = "Comprobando…";
+    let msg = "Código guardado", responsable = false;
+    try {
+      const r = await fetch("/api/escanear", { method: "POST", headers: { "content-type": "application/json", "x-app-code": nuevo }, body: JSON.stringify({ accion: "comprobar" }) });
+      if (r.status === 401) { toast("Ese código no es válido en el servidor"); b.disabled = false; b.textContent = "Guardar código"; return; }
+      if (r.ok) { msg = "Código correcto y guardado ✔"; responsable = !!(await r.json()).responsable; }
+      else msg = "Guardado (no he podido comprobarlo con el servidor)";
+    } catch { msg = "Guardado (no he podido comprobarlo con el servidor)"; }
+    S.ajustes.codigo = nuevo;
+    S.ajustes.responsable = responsable;
+    await guardar("ajustes");
+    pintarCodigo();
+    pintarRol();
+    enviarCola();
+    sincronizarBase();
+    toast(msg);
+  });
+}
+function pintarAjustes() {
+  $("#aj-digitos").value = S.ajustes.digitos;
+  $("#aj-niveles").value = S.ajustes.niveles;
+  $("#aj-playa").value = S.ajustes.playa ?? PLAYA_DEF;
+  // los niveles y la playa son de la base compartida: solo los cambia el responsable
+  ["#aj-digitos", "#aj-niveles", "#aj-playa"].forEach((s) => { $(s).disabled = soloLectura(); });
+  pintarCodigo();
+  $("#aj-tema").value = S.ajustes.tema;
+  const ej = [...IDX.ubiOriginal.values()][0] || "01-001-1";
+  const pp = partesUbi(ej);
+  const conTipo = [...TIPO_UBI.values()];
+  $("#aj-ejemplo").innerHTML = `Ejemplo: <b>${esc(ej)}</b> → ${pp?.zona ? `${esc(ALMACENES[pp.zona] || `almacén ${pp.zona}`)}, ` : ""}${pp ? `fila ${esc(pp.fila)}, hueco ${esc(pp.hueco)}, ` : ""}nivel ${esc(nivelDe(ej))} (${esPicking(ej) ? "picking" : esPlaya(ej) ? "playa, reserva" : "reserva"})` +
+    (conTipo.length ? `<br>Tipo conocido de ${conTipo.length} ubicaciones: ${conTipo.filter(Boolean).length} picking, ${conTipo.filter((x) => !x).length} otras.` : "");
+  pintarUso();
+}
+// ---------- pickings con más de un artículo (solo responsable) ----------
+// Sale del maestro: una ubicación de picking asignada a varios artículos. El índice solo guarda el último
+// artículo de cada ubicación, así que aquí se vuelve a leer el maestro entero.
+let PICK = { grupos: [], nUbis: 0, nArts: 0, largo: 0 };
+const PICK_VISTA = { pestana: "pend", limite: 60 };
+// «1.234,5» (formato español) o «12.5»: los puntos solo son de miles si hay coma decimal
+const cantidad = (v) => { if (typeof v === "number") return v; let t = String(v ?? "").trim(); if (t.includes(",")) t = t.replace(/\./g, "").replace(",", "."); const n = parseFloat(t); return isNaN(n) ? 0 : n; };
+const fmtCant = (n) => (Math.round(n * 100) / 100).toLocaleString("es-ES");
+function calcularPickings() {
+  const porUbi = new Map(), arts = new Set(), largos = {};
+  for (const m of [...(S.maestro?.filas || []), ...S.maestroManual]) {
+    if (!m.articulo || !m.ubicacion || !enZona(m.ubicacion)) continue;
+    const u = normUbi(m.ubicacion), k = normArt(m.articulo);
+    if (!u || !k) continue;
+    arts.add(k);
+    if (!porUbi.has(u)) { porUbi.set(u, { u, ubi: String(m.ubicacion).trim(), items: [] }); largos[u.length] = (largos[u.length] || 0) + 1; }
+    const g = porUbi.get(u);
+    if (!g.items.some((i) => i.k === k)) g.items.push({ k, articulo: String(m.articulo).trim(), descripcion: m.descripcion || IDX.articulos.get(k)?.descripcion || "" });
+  }
+  const largo = +(Object.entries(largos).sort((a, b) => b[1] - a[1])[0]?.[0] || 0);
+  const grupos = [...porUbi.values()].filter((g) => g.items.length > 1);
+  for (const g of grupos) {
+    g.raro = g.u.length !== largo;
+    g.clave = g.u + "|" + g.items.map((i) => i.k).sort().join(",");
+    for (const it of g.items) it.stock = stockEnPicking(it.k, g.u);
+  }
+  PICK = { grupos, nUbis: porUbi.size, nArts: arts.size, largo };
+}
+// Dónde hay stock del artículo en ubicaciones de picking (sin altura), con su propio picking primero
+function stockEnPicking(k, uPicking) {
+  const a = IDX.articulos.get(k);
+  if (!a) return [];
+  const porU = new Map();
+  for (const f of a.filas) {
+    if (!esPicking(f.ubicacion)) continue;
+    const c = f.cajas === "" || f.cajas == null ? 1 : cantidad(f.cajas);
+    if (c <= 0) continue;
+    if (!porU.has(f.u)) porU.set(f.u, { u: f.u, ubi: verUbi(f.u), cajas: 0, aqui: f.u === uPicking });
+    porU.get(f.u).cajas += c;
+  }
+  return [...porU.values()].sort((x, y) => (y.aqui - x.aqui) || x.u.localeCompare(y.u));
+}
+const pickHecho = (g) => S.pickHechos[g.clave];
+function ordenarPickings(lista) {
+  const porN = $("#pick-orden").value === "n";
+  return [...lista].sort((a, b) => (porN && b.items.length - a.items.length) || a.u.localeCompare(b.u));
+}
+function marcar(txt, q) {
+  const s = String(txt ?? "");
+  if (!q) return esc(s);
+  const i = norm(s).indexOf(q);
+  // norm() puede cambiar la longitud (acentos, signos): solo se resalta si el texto ya coincide tal cual
+  if (i < 0 || norm(s.slice(i, i + q.length)) !== q) return esc(s);
+  return esc(s.slice(0, i)) + "<mark>" + esc(s.slice(i, i + q.length)) + "</mark>" + esc(s.slice(i + q.length));
+}
+function pintarPickings() {
+  calcularPickings();
+  const { grupos } = PICK;
+  const nHechos = grupos.filter(pickHecho).length;
+  const hayStock = !!S.stock;
+  $("#pick-tiles").innerHTML = [
+    [grupos.length - nHechos, `pickings por arreglar (de ${grupos.length})`],
+    [grupos.reduce((n, g) => n + g.items.length, 0), "artículos en esos pickings"],
+    [PICK.nUbis, "pickings en el maestro"], [PICK.nArts, "artículos con picking"],
+  ].map(([n, t]) => `<div class="tile"><b>${n.toLocaleString("es-ES")}</b><span>${t}</span></div>`).join("");
+  $("#pick-n-pend").textContent = grupos.length - nHechos;
+  $("#pick-n-hecho").textContent = nHechos;
+  document.querySelectorAll("[data-pick]").forEach((b) => b.classList.toggle("on", b.dataset.pick === PICK_VISTA.pestana));
+  const enHechos = PICK_VISTA.pestana === "hecho";
+  $("#btn-pick-reset").classList.toggle("hidden", !enHechos || !nHechos);
+
+  const lista = $("#pick-lista");
+  if (!S.maestro?.filas?.length && !S.maestroManual.length) {
+    lista.innerHTML = `<div class="card"><p class="muted" style="margin:0">Carga el maestro de picking en <b>Datos</b>.</p></div>`;
+    $("#pick-cuenta").textContent = ""; $("#btn-pick-mas").classList.add("hidden");
+    return;
+  }
+  const q = norm($("#pick-buscar").value);
+  const datos = ordenarPickings(grupos.filter((g) => !!pickHecho(g) === enHechos && (!q || norm(g.ubi).includes(q) ||
+    g.items.some((it) => norm(`${it.articulo} ${it.descripcion}`).includes(q) || it.stock.some((s) => norm(s.ubi).includes(q))))));
+  const vistos = datos.slice(0, PICK_VISTA.limite);
+  $("#pick-cuenta").textContent = datos.length ? `Mostrando ${vistos.length} de ${datos.length} pickings${hayStock ? "" : " · carga el stock para ver dónde hay de cada artículo"}` : "";
+  $("#btn-pick-mas").classList.toggle("hidden", datos.length <= PICK_VISTA.limite);
+
+  if (!grupos.length) { lista.innerHTML = `<div class="card"><p style="margin:0"><b>Todo correcto 👍</b></p><p class="muted" style="margin:4px 0 0">Ningún picking del maestro tiene más de un artículo asignado.</p></div>`; return; }
+  if (!datos.length) { lista.innerHTML = `<div class="card"><p class="muted" style="margin:0">${q ? "No hay resultados para esa búsqueda." : enHechos ? "Todavía no has marcado ninguno como hecho." : "<b>¡Todo hecho!</b> No quedan pickings pendientes."}</p></div>`; return; }
+  lista.innerHTML = vistos.map((g) => {
+    const h = pickHecho(g), n = g.items.length;
+    return `<div class="card pick${h ? " hecho" : n >= 3 ? " n3" : ""}">
+      <div class="pick-cab"><div><div class="lbl">Picking${h ? " · hecho" : ""}</div><div class="pick-ubi">${marcar(g.ubi, q)}</div>
+        ${g.raro ? `<span class="badge warn">Código de ${g.u.length} caracteres (lo normal son ${PICK.largo})</span>` : ""}</div>
+        <div class="pick-num"><b>${n}</b><span>artículos</span></div></div>
+      <ul class="pick-arts">${g.items.map((it) => `<li><span class="pick-art">${marcar(it.articulo, q)}</span>${marcar(it.descripcion || "(sin descripción)", q)}
+        ${hayStock ? (it.stock.length ? `<div class="pick-stk">Stock en picking:<br>${it.stock.map((s) => `<span class="pick-sl${s.aqui ? " aqui" : ""}"${s.aqui ? ' title="Es este mismo picking"' : ""}>${marcar(s.ubi, q)} · ${fmtCant(s.cajas)} cj</span>`).join("")}</div>`
+          : `<div class="pick-stk"><i>Sin stock en ubicaciones de picking</i></div>`) : ""}</li>`).join("")}</ul>
+      <div class="pick-pie"><span class="muted">${h ? `Hecho el ${esc(new Date(h.fecha).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" }))}` : ""}</span>
+        ${h ? `<button class="btn small" data-pick-deshacer="${esc(g.clave)}">↺ Deshacer</button>` : `<button class="btn small primary" data-pick-hecho="${esc(g.clave)}">✓ Hecho</button>`}</div>
+    </div>`;
+  }).join("");
+}
+function exportarPickings() {
+  if (!PICK.grupos.length) return toast("No hay pickings con varios artículos");
+  const grupos = ordenarPickings(PICK.grupos);
+  const detalle = [], resumen = [];
+  for (const g of grupos) {
+    const h = pickHecho(g), estado = h ? "HECHO" : "PENDIENTE";
+    for (const it of g.items) detalle.push({ "Estado": estado, "Picking": g.ubi, "Nº artículos": g.items.length, "Artículo": it.articulo, "Descripción": it.descripcion,
+      ...(S.stock ? { "Stock en picking": it.stock.length ? it.stock.map((s) => `${s.ubi} (${fmtCant(s.cajas)} cj)`).join("; ") : "Sin stock en ubicaciones de picking" } : {}) });
+    resumen.push({ "Estado": estado, "Fecha hecho": h ? new Date(h.fecha).toLocaleString("es-ES") : "", "Picking": g.ubi, "Nº artículos": g.items.length, "Artículos": g.items.map((i) => i.articulo).join(", ") });
+  }
+  const wb = XLSX.utils.book_new();
+  const hoja = (filas, nombre, anchos) => { const ws = XLSX.utils.json_to_sheet(filas); ws["!cols"] = anchos.map((wch) => ({ wch })); ws["!autofilter"] = { ref: ws["!ref"] }; XLSX.utils.book_append_sheet(wb, ws, nombre); };
+  hoja(detalle, "Detalle", [12, 18, 12, 12, 50, 60]);
+  hoja(resumen, "Resumen", [12, 17, 18, 12, 60]);
+  XLSX.writeFile(wb, `pickings_varios_articulos_${S.ajustes.zona}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+// ---------- ubicaciones libres (todos) ----------
+// Libres = vacías (Excel de vacías) − asignadas (maestro), solo picking del almacén elegido.
+// Si el Excel de stock dice que hay mercancía, tampoco sale: el de vacías puede estar desfasado.
+const LIBRES_VISTA = { fuera: new Set() }; // niveles desmarcados
+let LIBRES = null;
+// una ubicación de 9 cifras que no empieza por 0 es una de 10 a la que Excel le quitó el cero
+const codUbi = (u) => { const c = normUbi(u); return /^\d{9}$/.test(c) && c[0] !== "0" ? "0" + c : c; };
+const nombreNivel = (n) => (n === 1 ? "Suelo" : n === 2 ? "Altura" : `Nivel ${pad(n)}`);
+function calcularLibres() {
+  const asignadas = new Set(), malas = [], vistasMalas = new Set();
+  for (const m of [...(S.maestro?.filas || []), ...S.maestroManual]) {
+    const c = codUbi(m.ubicacion);
+    if (!c) continue;
+    if (!partesUbi(m.ubicacion) && !partesUbi(c)) {
+      const clave = c + "|" + m.articulo;
+      if (!vistasMalas.has(clave)) { vistasMalas.add(clave); malas.push({ ubi: String(m.ubicacion).trim(), art: String(m.articulo ?? "").trim() }); }
+      continue;
+    }
+    asignadas.add(c);
+  }
+  const z = normUbi(S.ajustes.zona), vistas = new Set(), lista = [], conStock = [], niveles = new Set();
+  for (const v of S.vacias?.filas || []) {
+    const c = codUbi(v.ubicacion), p = partesUbi(v.ubicacion) || partesUbi(c);
+    if (!c || !p || vistas.has(c) || (z && !c.startsWith(z))) continue;
+    vistas.add(c);
+    if (esPlaya(c) || !(TIPO_UBI.get(normUbi(v.ubicacion)) ?? esPicking(c))) continue; // la reserva (y la playa) nunca tiene artículo asignado
+    if (asignadas.has(c)) continue;
+    if (IDX.stockPorUbi.has(c)) { conStock.push(c); continue; }
+    const nivel = parseInt(p.nivel, 10);
+    if (isNaN(nivel)) continue;
+    niveles.add(nivel);
+    lista.push({ c, fila: p.fila, hueco: p.hueco, nivel });
+  }
+  lista.sort((a, b) => a.c.localeCompare(b.c));
+  LIBRES = { lista, malas, conStock, niveles: [...niveles].sort((a, b) => a - b) };
+}
+// Lo que sale con los niveles marcados, agrupado por fila: [{ fila, porNivel: Map(nivel -> [huecos]) }]
+function libresVisibles() {
+  const nivs = LIBRES.niveles.filter((n) => !LIBRES_VISTA.fuera.has(n));
+  const filas = new Map();
+  let total = 0;
+  for (const x of LIBRES.lista) {
+    if (!nivs.includes(x.nivel)) continue;
+    if (!filas.has(x.fila)) filas.set(x.fila, new Map(nivs.map((n) => [n, []])));
+    filas.get(x.fila).get(x.nivel).push(x);
+    total++;
+  }
+  const orden = [...filas.keys()].sort((a, b) => (parseInt(a, 10) - parseInt(b, 10)) || a.localeCompare(b));
+  return { nivs, total, filas: orden.map((fila) => ({ fila, porNivel: filas.get(fila) })) };
+}
+const hoyTxt = () => new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
+const ciudadAlmacen = () => nombreAlmacen(S.ajustes.zona).replace(/^Garcimar\s+/i, "").toUpperCase();
+function pintarLibres() {
+  calcularLibres();
+  $("#libres-tag").textContent = `ALMACÉN ${S.ajustes.zona} · ${ciudadAlmacen()} · ${hoyTxt()}`;
+  const faltan = [!S.vacias?.filas?.length && "el Excel de ubicaciones vacías", !S.maestro?.filas?.length && !S.maestroManual.length && "el maestro de picking"].filter(Boolean);
+  const lectura = soloLectura();
+  $("#libres-fuente").textContent = faltan.length ? "" : `Vacías: ${S.vacias.archivo || "—"}${S.vacias.fecha ? ` (${new Date(S.vacias.fecha).toLocaleDateString("es-ES")})` : ""} · Maestro: ${S.maestro?.archivo || "asignaciones de la app"}${S.maestro?.fecha ? ` (${new Date(S.maestro.fecha).toLocaleDateString("es-ES")})` : ""}`;
+  $("#libres-niveles").innerHTML = LIBRES.niveles.map((n) => `<label><input type="checkbox" data-nivel="${n}" ${LIBRES_VISTA.fuera.has(n) ? "" : "checked"}> ${nombreNivel(n)} · nivel ${pad(n)}</label>`).join("");
+  if (faltan.length) {
+    $("#libres-total").textContent = "—"; $("#btn-libres-pdf").disabled = true; $("#libres-avisos").innerHTML = "";
+    $("#libres-lista").innerHTML = `<div class="card"><p class="muted" style="margin:0">Falta ${faltan.join(" y ")}. ${lectura ? `Lo${faltan.length > 1 ? "s" : ""} carga el responsable en <b>Datos</b> y te llega${faltan.length > 1 ? "n" : ""} solo${faltan.length > 1 ? "s" : ""}.` : `Cárga${faltan.length > 1 ? "los" : "lo"} en <b>Datos</b>.`}</p></div>`;
+    return;
+  }
+  const v = libresVisibles();
+  $("#libres-total").textContent = v.total.toLocaleString("es-ES");
+  $("#btn-libres-pdf").disabled = !v.total;
+
+  const avisos = [];
+  if (LIBRES.malas.length) avisos.push(`<div class="verdict warn" style="font-size:15px;font-weight:500"><b>${LIBRES.malas.length} ${LIBRES.malas.length === 1 ? "ubicación mal escrita" : "ubicaciones mal escritas"} en el maestro:</b>
+    ${LIBRES.malas.slice(0, 8).map((m) => `<span class="mono">${esc(m.ubi)}</span>${m.art ? ` (art. ${esc(m.art)})` : ""}`).join(", ")}${LIBRES.malas.length > 8 ? "…" : ""}.
+    Esos artículos no cuentan como asignados: si su picking real está vacío, saldrá aquí como libre. Hay que corregirlo en el maestro.</div>`);
+  if (LIBRES.conStock.length) avisos.push(`<details class="card"><summary>${LIBRES.conStock.length} vacías sin asignar no salen porque el Excel de stock dice que tienen mercancía</summary>
+    <p class="muted">Puede que el Excel de vacías o el de stock estén desfasados.</p><p class="mono">${LIBRES.conStock.map((c) => esc(verUbi(c))).join(", ")}</p></details>`);
+  $("#libres-avisos").innerHTML = avisos.join("");
+
+  if (!v.total) { $("#libres-lista").innerHTML = `<div class="card"><p class="muted" style="margin:0">No hay ninguna ubicación de picking vacía y sin asignar${v.nivs.length < LIBRES.niveles.length ? " con los niveles marcados" : ""}.</p></div>`; return; }
+  $("#libres-lista").innerHTML = `<div class="card"><p class="muted" style="margin:0 0 4px">Toca una ubicación para copiar su código.</p>${v.filas.map(({ fila, porNivel }) => {
+    const n = [...porNivel.values()].reduce((a, l) => a + l.length, 0);
+    return `<div class="libre-fila"><div><b>Fila ${esc(fila)}</b><span>${n} ${n === 1 ? "ubicación" : "ubicaciones"}</span></div><div>${[...porNivel].map(([nv, l]) => `<div class="libre-nivel"><span>${nombreNivel(nv)}<em>nivel ${pad(nv)}</em></span>
+      <div class="libre-chips">${l.length ? l.map((x) => `<button class="libre-ch" data-copiar="${esc(codigoSistema(x.c))}" title="${esc(verUbi(x.c))}"><i></i>${esc(x.hueco)}</button>`).join("") : `<span class="libre-none">Ninguna</span>`}</div></div>`).join("")}</div></div>`;
+  }).join("")}</div>`;
+}
+// jsPDF solo se descarga la primera vez que se pide el PDF
+let jsPdfListo = null;
+function cargarJsPdf() {
+  if (window.jspdf) return Promise.resolve(window.jspdf);
+  return (jsPdfListo ||= new Promise((res, rej) => {
+    const sc = document.createElement("script");
+    sc.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    sc.onload = () => (window.jspdf ? res(window.jspdf) : rej(new Error("sin jsPDF")));
+    sc.onerror = () => { jsPdfListo = null; rej(new Error("sin conexión")); };
+    document.head.appendChild(sc);
+  }));
+}
+// Hoja A4 como la de la herramienta original: casillas de 16 × 6,2 mm, 7 por línea, una fila nunca se parte entre páginas
+function hojaLibres(jsPDF, v) {
+  const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
+  const M = 11, W = 210, H = 297, X0 = 68, X1 = W - M, CW = 16, CH = 6.2, GAP = 2, RH = CH + 2;
+  const porLinea = Math.floor((X1 - X0 + GAP) / (CW + GAP));
+  const tinta = [21, 26, 23], gris = [93, 104, 98], raya = [185, 192, 187];
+  const fuente = (k, w, pt) => { doc.setFont(k === "mono" ? "courier" : "helvetica", w); doc.setFontSize(pt); };
+  const linea = (x1, y1, x2, y2, c, lw) => { doc.setDrawColor(...c); doc.setLineWidth(lw); doc.line(x1, y1, x2, y2); };
+  let y = M;
+  const tag = `ALMACÉN ${S.ajustes.zona} · ${ciudadAlmacen()} · ${hoyTxt()}`;
+  fuente("mono", "bold", 8); doc.setFillColor(255, 210, 63); doc.rect(M, y, doc.getTextWidth(tag) + 4, 5, "F");
+  doc.setTextColor(...tinta); doc.text(tag, M + 2, y + 3.6);
+  fuente("sans", "bold", 24); doc.text("UBICACIONES LIBRES", M, y + 15);
+  fuente("sans", "normal", 10.5); doc.setTextColor(...gris);
+  doc.text(`Picking ${v.nivs.map((n) => nombreNivel(n).toLowerCase()).join(" y ")} · Vacías y sin artículo asignado`, M, y + 21);
+  doc.setTextColor(...tinta); fuente("mono", "bold", 32); doc.text(String(v.total), X1, y + 15, { align: "right" });
+  fuente("sans", "bold", 9); doc.text("UBICACIONES", X1, y + 21, { align: "right" });
+  y += 24; linea(M, y, X1, y, tinta, 0.8); y += 4;
+  fuente("sans", "normal", 9.5); doc.setTextColor(...gris);
+  doc.text("Estas ubicaciones de picking no tienen stock ni artículo asignado. Están disponibles para asignar artículos nuevos.", M, y + 3);
+  y += 8;
+  for (const { fila, porNivel } of v.filas) {
+    const alto = [...porNivel.values()].reduce((a, l) => a + Math.max(1, Math.ceil(l.length / porLinea)) * RH + 1, 0) + 4;
+    if (y + alto > H - 14) { doc.addPage(); y = M; }
+    const y0 = y + 3;
+    doc.setTextColor(...tinta); fuente("sans", "bold", 18); doc.text(`FILA ${fila}`, M, y0 + 5);
+    const n = [...porNivel.values()].reduce((a, l) => a + l.length, 0);
+    fuente("sans", "bold", 9.5); doc.text(`${n} ${n === 1 ? "ubicación" : "ubicaciones"}`, M, y0 + 10);
+    let ly = y0;
+    for (const [nv, l] of porNivel) {
+      fuente("sans", "bold", 9); doc.setTextColor(...tinta); doc.text(nombreNivel(nv).toUpperCase(), 45, ly + 3.8);
+      fuente("mono", "normal", 7); doc.setTextColor(...gris); doc.text(`NIVEL ${pad(nv)}`, 45, ly + 7);
+      if (!l.length) { fuente("sans", "normal", 9.5); doc.text("Ninguna", X0, ly + 4.2); ly += RH + 1; continue; }
+      fuente("mono", "bold", 11); doc.setTextColor(...tinta); doc.setDrawColor(...tinta); doc.setLineWidth(0.35);
+      l.forEach((x, i) => {
+        const cx = X0 + (i % porLinea) * (CW + GAP), cy = ly + Math.floor(i / porLinea) * RH;
+        doc.roundedRect(cx, cy, CW, CH, 0.8, 0.8, "S");
+        doc.rect(cx + 1.4, cy + 1.8, 2.6, 2.6, "S");
+        doc.text(String(x.hueco), cx + 5.2, cy + 4.4);
+      });
+      ly += Math.ceil(l.length / porLinea) * RH + 1;
+    }
+    y = Math.max(ly, y0 + 12) + 2;
+    linea(M, y, X1, y, raya, 0.25);
+  }
+  const paginas = doc.getNumberOfPages();
+  for (let pg = 1; pg <= paginas; pg++) { doc.setPage(pg); fuente("sans", "normal", 7.5); doc.setTextColor(...gris); doc.text(`Ubicaciones libres · página ${pg} de ${paginas}`, W / 2, H - 6, { align: "center" }); }
+  return doc;
+}
+async function pdfLibres() {
+  const v = libresVisibles();
+  if (!v.total) return;
+  const b = $("#btn-libres-pdf"); b.disabled = true;
+  try {
+    const { jsPDF } = await cargarJsPdf();
+    const d = new Date();
+    hojaLibres(jsPDF, v).save(`ubicaciones_libres_${S.ajustes.zona}_${pad(d.getDate())}${pad(d.getMonth() + 1)}.pdf`);
+  } catch (e) { toast(`No he podido preparar el PDF (${e.message}). Comprueba la conexión.`); }
+  finally { b.disabled = false; }
+}
+
+// ---------- descargas: listado de pedidos de compras (PDF) ----------
+// Se lee el texto del PDF (no hace falta IA): se juntan los trozos que están a la misma altura en líneas
+// y se reconoce cada línea: PROVEEDOR…, un artículo, la continuación de su descripción o TOTAL PEDIDO.
+let PED = null; // { archivo, cargado, fechaListado, organizacion, pedidos: [...], totalGeneral }
+let pdfJsListo = null;
+const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+function cargarPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  return (pdfJsListo ||= new Promise((res, rej) => {
+    const sc = document.createElement("script");
+    sc.src = PDFJS + "pdf.min.js";
+    sc.onload = () => {
+      if (!window.pdfjsLib) return rej(new Error("sin pdf.js"));
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js";
+      res(window.pdfjsLib);
+    };
+    sc.onerror = () => { pdfJsListo = null; rej(new Error("sin conexión")); };
+    document.head.appendChild(sc);
+  }));
+}
+async function lineasPdf(datos) {
+  const lib = await cargarPdfJs();
+  const pdf = await lib.getDocument({ data: datos }).promise;
+  const lineas = [];
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const tc = await (await pdf.getPage(n)).getTextContent();
+    const items = tc.items.filter((i) => i.str && i.str.trim()).map((i) => ({ x: i.transform[4], y: i.transform[5], t: i.str.trim() }));
+    const filas = [];
+    for (const it of items.sort((a, b) => b.y - a.y)) {
+      const f = filas.find((f) => Math.abs(f.y - it.y) <= 2);
+      if (f) f.items.push(it); else filas.push({ y: it.y, items: [it] });
+    }
+    for (const f of filas.sort((a, b) => b.y - a.y)) {
+      f.items.sort((a, b) => a.x - b.x);
+      lineas.push({ pag: n, y: f.y, items: f.items, texto: f.items.map((i) => i.t).join(" ").replace(/\s+/g, " ").trim() });
+    }
+  }
+  return lineas;
+}
+const RX_FECHA = /\d{2}\/\d{2}\/\d{4}/;
+const RX_NUM = /^-?[\d.]*\d,\d+$|^-?\d+$/;
+function leerListado(lineas) {
+  const L = { fechaListado: "", organizacion: "", pedidos: [], totalGeneral: "", totalOrg: "" };
+  let ped = null, art = null;
+  for (const ln of lineas) {
+    const t = ln.texto;
+    let m;
+    // la fecha del listado va arriba a la derecha («17/11/2026 PAG. 1»), a veces en la misma línea que el título
+    if ((m = t.match(/(\d{2}\/\d{2}\/\d{4})\s+PAG\.?\s*\d+/i))) L.fechaListado ||= m[1];
+    if (/^LISTADO PEDIDOS/i.test(t) || /^GARCIMAR/i.test(t) || /^STA\b|^ARTICULO\b.*ENTREGA/i.test(t)) { art = null; continue; }
+    if (/^\d{2}\/\d{2}\/\d{4}\s+PAG\.?\s*\d+/i.test(t)) { art = null; continue; }
+    if (/^ORGANIZACI[OÓ]N COMPRAS/i.test(t)) { L.organizacion ||= t.replace(/^ORGANIZACI[OÓ]N COMPRAS\s*/i, "").trim(); art = null; continue; }
+    if ((m = t.match(/^TOTAL POR ORGANIZACI[OÓ]N:?\s*(\S+)?/i))) { L.totalOrg = m[1] || ""; art = null; continue; }
+    if ((m = t.match(/^TOTAL GENERAL:?\s*(\S+)?/i))) { L.totalGeneral = m[1] || ""; art = null; continue; }
+    // el código de proveedor puede llevar letras (p. ej. W999 SARL LA FAMILLE BOUTRAIS)
+    if ((m = t.match(/^PROVEEDOR\s*([A-Z0-9]+)\s+(.*)$/i))) {
+      const resto = m[2];
+      const g = (rx) => (resto.match(rx) || [])[1]?.trim() || "";
+      ped = {
+        prov: m[1], nombre: resto.split(/\s+SERIE\s*\/\s*PEDIDO/i)[0].trim(),
+        pedido: g(/SERIE\s*\/\s*PEDIDO\s*(.*?)\s*(?:REF\.|FECHA|DIVISA|$)/i), ref: g(/REF\.\s*(.*?)\s*(?:FECHA|DIVISA|$)/i),
+        fecha: g(/FECHA\s*(\d{2}\/\d{2}\/\d{4})/i), divisa: g(/DIVISA\s*(\S+)/i), lineas: [], total: null,
+      };
+      L.pedidos.push(ped); art = null; continue;
+    }
+    if ((m = t.match(/^TOTAL PEDIDO:?\s*(.*)$/i))) {
+      const n = m[1].split(" ").filter((x) => RX_NUM.test(x));
+      if (ped) ped.total = { pedidas: n[0] || "", pdtes: n[1] || "", importe: n[2] || "" };
+      art = null; continue;
+    }
+    // artículo: código (6 cifras y a veces una letra), descripción, fecha de entrega y las cifras
+    if ((m = t.match(/^(?:\S{1,3}\s+)??([A-Z]?\d{5,7}[A-Z]?)\s+(.*?)\s*(\d{2}\/\d{2}\/\d{4})\s+(.*)$/)) && /\d,\d/.test(m[4])) {
+      // un artículo sin cabecera de proveedor delante (o detrás del TOTAL PEDIDO del anterior) no se mete en
+      // otro pedido: va en uno aparte, avisando, para que no se mezcle con el de otro proveedor
+      if (!ped || ped.total) {
+        ped = { prov: "", nombre: "", pedido: "", ref: "", fecha: "", divisa: "", lineas: [], total: null, sinCabecera: true };
+        L.pedidos.push(ped);
+      }
+      const tok = m[4].replace(/(\d)([A-Za-z]{1,3})(?=\s|$)/g, "$1 $2").split(" ").filter(Boolean);
+      const pedidas = tok.shift() || "";
+      const unidad = tok[0] && !RX_NUM.test(tok[0]) ? tok.shift() : "";
+      const [pdtes = "", precio = "", dto = "", neto = "", importe = ""] = tok;
+      const codItem = ln.items.find((i) => i.t.startsWith(m[1])) || ln.items[0];
+      const fechaItem = ln.items.find((i) => RX_FECHA.test(i.t));
+      art = { art: m[1], desc: m[2], entrega: (t.match(RX_FECHA) || [])[0] || "", pedidas, unidad, pdtes, precio, dto, neto, importe, pag: ln.pag, y: ln.y, xCod: codItem.x, xFecha: fechaItem ? fechaItem.x : Infinity };
+      ped.lineas.push(art); continue;
+    }
+    // segunda línea de la descripción: justo debajo del artículo, en la columna de la descripción y sin cifras
+    if (art && ln.pag === art.pag && art.y - ln.y < 14 && ln.items[0].x > art.xCod + 4 && ln.items[0].x < art.xFecha && !RX_FECHA.test(t)) {
+      art.desc = `${art.desc} ${t}`.trim();
+      art.y = ln.y;
+      continue;
+    }
+  }
+  L.pedidos = L.pedidos.filter((p) => p.lineas.length);
+  // comprobación: las unidades de los artículos tienen que sumar el TOTAL PEDIDO del listado
+  for (const p of L.pedidos) {
+    const suma = p.lineas.reduce((n, l) => n + cantidad(l.pedidas), 0);
+    if (p.sinCabecera) p.aviso = "No he podido leer el proveedor de este pedido. Revísalo en el listado original.";
+    else if (!p.total) p.aviso = "El listado no trae el total de este pedido. Revísalo en el original.";
+    else if (Math.abs(suma - cantidad(p.total.pedidas)) > 0.01) p.aviso = `Las unidades de los artículos (${fmtCant(suma)}) no suman el total del pedido (${p.total.pedidas}). Revísalo en el listado original.`;
+  }
+  return L;
+}
+const pickingsDe = (cod) => IDX.pickingDeArt.get(normArt(cod)) || [];
+async function cargarListado(file) {
+  if (!file) return;
+  const est = $("#ped-estado");
+  const aviso = (msg) => { est.classList.toggle("hidden", !msg); est.innerHTML = msg || ""; };
+  try {
+    aviso("Leyendo el PDF…");
+    const L = leerListado(await lineasPdf(new Uint8Array(await file.arrayBuffer())));
+    if (!L.pedidos.length) { aviso("⚠️ No he encontrado pedidos en este PDF. ¿Es el «Listado pedidos de compras»?"); return; }
+    PED = { ...L, archivo: file.name, cargado: Date.now() };
+    await store.set("pedidos", PED);
+    aviso("");
+    pintarDescargas();
+    toast(`Listado cargado: ${L.pedidos.length} pedidos`);
+  } catch (e) {
+    aviso(`⚠️ No he podido leer el PDF (${esc(e.message)}).${/conexi/.test(e.message) ? " Comprueba la conexión: la primera vez hay que descargar el lector de PDF." : ""}`);
+  }
+}
+function pintarDescargas() {
+  const doc = $("#ped-doc");
+  $("#ped-acciones").classList.toggle("hidden", !PED);
+  if (!PED) { $("#ped-tiles").innerHTML = ""; doc.innerHTML = ""; return; }
+  const lineas = PED.pedidos.flatMap((p) => p.lineas);
+  const sinPk = lineas.filter((l) => !pickingsDe(l.art).length).length;
+  const provs = new Set(PED.pedidos.map((p) => p.prov).filter(Boolean)).size;
+  const conAviso = PED.pedidos.filter((p) => p.aviso).length;
+  $("#ped-tiles").innerHTML = [[provs, "proveedores"], [PED.pedidos.length, "pedidos"], [lineas.length, "artículos"], [sinPk, "sin picking asignado"], ...(conAviso ? [[conAviso, "pedidos para revisar"]] : [])]
+    .map(([n, t]) => `<div class="tile"><b>${n}</b><span>${t}</span></div>`).join("");
+  const sinMaestro = !IDX.hayMaestro ? `<div class="card noprint"><p class="muted" style="margin:0">⚠️ No hay maestro de picking cargado para ${esc(nombreAlmacen(S.ajustes.zona))}: no puedo decir el picking de ningún artículo.</p></div>` : "";
+  const celdaPk = (cod) => { const pk = pickingsDe(cod); return pk.length ? pk.map((u) => `<div class="ped-pk">${esc(u)}</div>`).join("") : `<span class="ped-sin">SIN PICKING</span>`; };
+  const ahora = new Date().toLocaleString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  doc.innerHTML = `${sinMaestro}<div class="ped-titulo"><h2>LISTADO PEDIDOS DE COMPRAS · UBICACIÓN DE PICKING</h2>
+    <p>${esc(nombreAlmacen(S.ajustes.zona))}${PED.organizacion ? ` · ${esc(PED.organizacion)}` : ""}${PED.fechaListado ? ` · listado del ${esc(PED.fechaListado)}` : ""} · impreso el ${esc(ahora)}</p></div>
+    ${PED.pedidos.map((p) => `<div class="ped">
+      <div class="ped-cab"><b>${p.sinCabecera ? "PROVEEDOR SIN LEER" : `PROVEEDOR ${esc(p.prov)} ${esc(p.nombre)}`}</b><span>Serie/pedido ${esc(p.pedido)}</span>${p.ref ? `<span>Ref. ${esc(p.ref)}</span>` : ""}${p.fecha ? `<span>Fecha ${esc(p.fecha)}</span>` : ""}${p.divisa ? `<span class="imp">Divisa ${esc(p.divisa)}</span>` : ""}</div>
+      ${p.aviso ? `<div class="ped-aviso">⚠️ ${esc(p.aviso)}</div>` : ""}
+      <table class="ped-tbl"><thead><tr><th>Artículo</th><th>Descripción</th><th class="imp">Entrega</th><th class="num">Ud. pedidas</th><th class="num imp">Ud. pdtes.</th><th class="num imp">Precio</th><th class="num imp">% Dto</th><th class="num imp">Pr. neto</th><th class="num imp">Importe</th><th>Picking</th></tr></thead>
+      <tbody>${p.lineas.map((l) => `<tr><td class="cod">${esc(l.art)}</td><td>${esc(l.desc)}</td><td class="imp">${esc(l.entrega)}</td><td class="num">${esc(l.pedidas)} ${esc(l.unidad)}</td><td class="num imp">${esc(l.pdtes)}</td><td class="num imp">${esc(l.precio)}</td><td class="num imp">${esc(l.dto)}</td><td class="num imp">${esc(l.neto)}</td><td class="num imp">${esc(l.importe)}</td><td>${celdaPk(l.art)}</td></tr>`).join("")}</tbody>
+      ${p.total ? `<tfoot><tr><td></td><td>TOTAL PEDIDO</td><td class="imp"></td><td class="num">${esc(p.total.pedidas)}</td><td class="num imp">${esc(p.total.pdtes)}</td><td class="imp" colspan="3"></td><td class="num imp">${esc(p.total.importe)}</td><td></td></tr></tfoot>` : ""}</table>
+    </div>`).join("")}
+    ${PED.totalGeneral ? `<p class="imp" style="text-align:right;font-weight:700;margin:4px 0 0">TOTAL GENERAL: ${esc(PED.totalGeneral)}</p>` : ""}`;
+}
+function exportarListado() {
+  if (!PED) return;
+  const filas = PED.pedidos.flatMap((p) => p.lineas.map((l) => ({ "Proveedor": `${p.prov} ${p.nombre}`, "Serie/pedido": p.pedido, "Ref.": p.ref, "Fecha pedido": p.fecha, "Artículo": l.art, "Descripción": l.desc, "Entrega": l.entrega,
+    "Ud. pedidas": l.pedidas, "Unidad": l.unidad, "Ud. pdtes.": l.pdtes, "Precio": l.precio, "% Dto": l.dto, "Pr. neto": l.neto, "Importe": l.importe, "Picking": pickingsDe(l.art).join(" / ") || "SIN PICKING" })));
+  descargarExcel(filas, "Descargas", `descargas_picking_${S.ajustes.zona}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function refrescar() {
+  construirIndice();
+  pintarAlmacen();
+  $("#aviso-sin-datos").classList.toggle("hidden", !!S.stock);
+  pintarCargas(); pintarInforme(); pintarPickings(); pintarLibres(); pintarDescargas(); pintarAjustes();
+}
+
+document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("on", x === b));
+  document.querySelectorAll("section.tab").forEach((s) => s.classList.toggle("on", s.id === "tab-" + b.dataset.tab));
+  window.scrollTo(0, 0);
+}));
+// La base cambia poco: se comprueba al volver a la app (como mucho una vez por minuto) y cada 5 minutos con ella abierta
+setInterval(() => { if (document.visibilityState === "visible") sincronizarBase(); }, 5 * 60000);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  enviarCola();
+  if (Date.now() - BASE.comprobada > 60000) sincronizarBase();
+});
+window.addEventListener("online", enviarCola);
+$("#btn-ir-datos").addEventListener("click", () => document.querySelector('nav button[data-tab="datos"]').click());
+$("#btn-foto").addEventListener("click", () => $("#in-foto").click());
+$("#btn-galeria").addEventListener("click", () => $("#in-galeria").click());
+$("#in-foto").addEventListener("change", (e) => { procesarFoto(e.target.files[0]); e.target.value = ""; });
+$("#in-galeria").addEventListener("change", (e) => { procesarFoto(e.target.files[0]); e.target.value = ""; });
+$("#ubi-actual").addEventListener("change", (e) => { try { localStorage.setItem("ubiActual", e.target.value); } catch {} if (ULTIMO) mostrarResultado(ULTIMO); });
+$("#buscar").addEventListener("input", (e) => buscar(e.target.value));
+$("#filtro-informe").addEventListener("input", pintarInforme);
+$("#pick-buscar").addEventListener("input", () => { PICK_VISTA.limite = 60; pintarPickings(); });
+$("#pick-orden").addEventListener("change", pintarPickings);
+$("#btn-pick-mas").addEventListener("click", () => { PICK_VISTA.limite += 120; pintarPickings(); });
+$("#btn-pick-export").addEventListener("click", exportarPickings);
+$("#btn-pick-imprimir").addEventListener("click", () => { const l = PICK_VISTA.limite; PICK_VISTA.limite = 1e6; pintarPickings(); window.print(); PICK_VISTA.limite = l; pintarPickings(); });
+$("#btn-pick-reset").addEventListener("click", async () => {
+  if (!confirm("¿Volver a poner todos los pickings hechos como pendientes?")) return;
+  for (const g of PICK.grupos) delete S.pickHechos[g.clave];
+  await guardar("pickHechos"); PICK_VISTA.pestana = "pend"; pintarPickings();
+});
+$("#btn-libres-pdf").addEventListener("click", pdfLibres);
+$("#in-pedidos").addEventListener("change", (e) => { cargarListado(e.target.files[0]); e.target.value = ""; });
+$("#btn-ped-imprimir").addEventListener("click", () => { pintarDescargas(); window.print(); });
+$("#btn-ped-excel").addEventListener("click", exportarListado);
+$("#btn-ped-quitar").addEventListener("click", async () => { PED = null; await store.del("pedidos"); pintarDescargas(); });
+$("#libres-niveles").addEventListener("change", (e) => {
+  const n = +e.target.dataset.nivel;
+  if (e.target.checked) LIBRES_VISTA.fuera.delete(n); else LIBRES_VISTA.fuera.add(n);
+  pintarLibres();
+});
+$("#libres-lista").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-copiar]");
+  if (!b) return;
+  await copiar(b.dataset.copiar); toast(`Copiado: ${b.dataset.copiar}`);
+});
+$("#tab-pickings").addEventListener("click", async (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.pick) { PICK_VISTA.pestana = b.dataset.pick; PICK_VISTA.limite = 60; pintarPickings(); return; }
+  // la clave lleva el picking y sus artículos: si en un maestro nuevo cambia la asignación, vuelve a pendientes
+  if (b.dataset.pickHecho) S.pickHechos[b.dataset.pickHecho] = { fecha: Date.now() };
+  else if (b.dataset.pickDeshacer) delete S.pickHechos[b.dataset.pickDeshacer];
+  else return;
+  await guardar("pickHechos"); pintarPickings();
+});
+$("#btn-export-mov").addEventListener("click", exportarMovimientos);
+$("#btn-export-maestro").addEventListener("click", () => {
+  const filas = [...IDX.asignadosDeUbi].flatMap(([u, ks]) => [...ks].map((k) => [u, k])).map(([u, k]) => ({ "Artículo": IDX.articulos.get(k)?.articulo || k, "Descriptivo": IDX.articulos.get(k)?.descripcion || "", "Ubicación picking": verUbi(u) }));
+  if (!filas.length) return toast("No hay maestro");
+  descargarExcel(filas, "Maestro", "maestro_picking.xlsx");
+});
+$("#btn-export-alias").addEventListener("click", () => {
+  const filas = Object.entries(S.alias).map(([t, k]) => ({ "Texto etiqueta": t, "Artículo": IDX.articulos.get(k)?.articulo || k, "Descriptivo": IDX.articulos.get(k)?.descripcion || "" }));
+  if (!filas.length) return toast("Todavía no hay alias");
+  descargarExcel(filas, "Alias", "alias_etiquetas.xlsx");
+});
+$("#btn-ejemplo").addEventListener("click", async () => {
+  const d = datosEjemplo();
+  const ahora = Date.now();
+  S.stock = { filas: d.stock, archivo: "ejemplo", fecha: ahora };
+  S.maestro = { filas: d.maestro, archivo: "ejemplo", fecha: ahora };
+  S.vacias = { filas: d.vacias, archivo: "ejemplo", fecha: ahora };
+  S.maestroManual = [];
+  S.ajustes.digitos = 1; S.ajustes.niveles = "1,2";
+  await Promise.all(["stock", "maestro", "vacias", "maestroManual", "ajustes"].map(guardar));
+  refrescar();
+  toast("Datos de ejemplo cargados");
+});
+const guardarAjustes = () => {
+  const antes = JSON.stringify(datosBase("ajustes"));
+  S.ajustes.digitos = Math.max(1, Math.min(3, +$("#aj-digitos").value || 1));
+  S.ajustes.niveles = $("#aj-niveles").value;
+  S.ajustes.playa = $("#aj-playa").value.trim();
+  S.ajustes.tema = $("#aj-tema").value;
+  guardar("ajustes"); aplicarTema(); construirIndice(); pintarCargas(); pintarInforme(); pintarPickings(); pintarLibres(); pintarAjustes();
+  if (S.ajustes.responsable && JSON.stringify(datosBase("ajustes")) !== antes) subirBase(["ajustes"]);
+};
+["#aj-digitos", "#aj-niveles", "#aj-playa", "#aj-tema"].forEach((s) => $(s).addEventListener("change", guardarAjustes));
+$("#btn-almacen").addEventListener("click", () => mostrarElegir(true));
+$("#btn-cambiar-almacen").addEventListener("click", () => mostrarElegir(true));
+$("#elegir-lista").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  $("#elegir-almacen").classList.add("hidden");
+  if (b.dataset.cancelar) return;
+  try { sessionStorage.setItem("almacenElegido", "1"); } catch {}
+  cambiarAlmacen(b.dataset.almacen);
+});
+$("#btn-borrar-alias").addEventListener("click", async () => { if (!confirm("¿Borrar los alias aprendidos?")) return; S.alias = {}; await guardar("alias"); toast("Alias borrados"); });
+$("#btn-borrar-todo").addEventListener("click", async () => {
+  if (!confirm("¿Borrar todos los Excel, alias y asignaciones de este móvil?")) return;
+  // la cola no se borra: lo anotado sin cobertura se sigue enviando, y el historial compartido se vuelve a leer del servidor
+  // la base compartida no se toca: este dispositivo la vuelve a descargar
+  for (const k of ["maestroManual", "alias", "mapeos", "pickHechos", "pedidos"]) await store.del(k);
+  for (const k of POR_ALMACEN) for (const z of Object.keys(ALMACENES)) await store.del(`${k}@${z}`);
+  S.stock = S.maestro = S.vacias = null; PED = null; S.maestroManual = []; S.alias = {}; S.mapeos = {}; S.tiposUbi = {}; S.pickHechos = {}; S.baseVer = {}; S.basePend = [];
+  refrescar(); toast("Datos borrados");
+  sincronizarBase();
+});
+
+(async () => {
+  await cargarEstado();
+  PED = (await store.get("pedidos")) || null;
+  aplicarTema();
+  try { $("#ubi-actual").value = localStorage.getItem("ubiActual") || ""; } catch {}
+  refrescar();
+  pintarRol();
+  enviarCola();
+  // Se pregunta una vez cada vez que se entra; al recargar la página (por ejemplo, tras la cámara) no
+  let elegido = false;
+  try { elegido = !!sessionStorage.getItem("almacenElegido"); } catch {}
+  if (!elegido) mostrarElegir(false);
+  await comprobarRol();
+  if (elegido) sincronizarBase(); // si no, se sincroniza al elegir, sin descargar antes el almacén anterior
+})();
+</script>
+</body>
+</html>
